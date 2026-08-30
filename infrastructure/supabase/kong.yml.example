@@ -1,0 +1,108 @@
+# TEMPLATE — copy to volumes/api/kong.yml (gitignored) and fill in the
+# dashboard credentials at the bottom. volumes/api/kong.yml is what the
+# ecke-crm-kong container actually mounts. Upstream `url:` hosts below are
+# the docker-compose service names (db / auth / rest / … / edge-functions).
+_format_version: "1.1"
+
+# Local dev only: wide open so the Vite dev server (random localhost port per
+# run) always works without CORS errors. Before any non-localhost deployment,
+# replace `origins: ["*"]` with the actual deployed origin(s).
+plugins:
+  - name: cors
+    config:
+      origins:
+        - "*"
+      methods:
+        - GET
+        - POST
+        - PUT
+        - PATCH
+        - DELETE
+        - OPTIONS
+      headers:
+        - Accept
+        - Authorization
+        - Content-Type
+        - apikey
+        - X-Client-Info
+        - X-Supabase-Api-Version
+        - Prefer
+        - Range
+        - Accept-Profile
+        - Content-Profile
+      exposed_headers:
+        - Content-Range
+        - X-Client-Info
+      credentials: true
+      max_age: 3600
+
+services:
+  - name: auth
+    url: http://auth:9999
+    routes:
+      - name: auth-route
+        paths:
+          - /auth/v1
+
+  - name: rest
+    url: http://rest:3000
+    routes:
+      - name: rest-route
+        paths:
+          - /rest/v1
+
+  - name: realtime
+    url: http://realtime:4000
+    routes:
+      - name: realtime-route
+        paths:
+          - /realtime/v1
+
+  - name: storage
+    url: http://storage:5000
+    routes:
+      - name: storage-route
+        paths:
+          - /storage/v1
+
+  - name: meta
+    url: http://meta:8080
+    routes:
+      - name: meta-route
+        paths:
+          - /pg_meta/v1
+
+  - name: functions
+    url: http://edge-functions:9000
+    routes:
+      - name: functions-route
+        strip_path: true
+        paths:
+          - /functions/v1
+
+  # Catch-all last: Kong's radix-tree router matches by longest path prefix
+  # regardless of declaration order, so the specific /auth/v1, /rest/v1, etc.
+  # routes above still win over this "/" route for their own paths.
+  - name: studio
+    url: http://studio:3000
+    routes:
+      - name: studio-route
+        paths:
+          - /
+    plugins:
+      - name: basic-auth
+        config:
+          hide_credentials: true
+
+# Studio itself ships with no auth of its own — this consumer + the
+# basic-auth plugin on studio-route above is the only gate in front of it.
+#
+# SETUP: copy this file to volumes/api/kong.yml (gitignored) and replace the
+# username/password below with real values that match DASHBOARD_USERNAME /
+# DASHBOARD_PASSWORD in ../.env. Kong's declarative config loader does not
+# expand env vars, so they are kept in sync by hand.
+consumers:
+  - username: DASHBOARD
+    basicauth_credentials:
+      - username: CHANGE_ME_DASHBOARD_USERNAME
+        password: CHANGE_ME_DASHBOARD_PASSWORD

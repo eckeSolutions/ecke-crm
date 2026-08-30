@@ -1,0 +1,218 @@
+# ecke-crm — self-hosted Supabase stack (Hetzner + Coolify).
+# Based on the official Supabase docker-compose template.
+#
+# `name:` sets the Compose project → `docker compose ls` shows "ecke-crm",
+# and every container is named ecke-crm-<service> (not the ambiguous
+# "supabase-*" the old repo used — several other stacks on this machine also
+# ship supabase/* images).
+name: ecke-crm
+
+services:
+  db:
+    container_name: ecke-crm-db
+    image: supabase/postgres:15.1.1.78
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./volumes/db/data:/var/lib/postgresql/data
+    networks:
+      - ecke-crm-network
+
+  auth:
+    container_name: ecke-crm-auth
+    image: supabase/gotrue:v2.151.0
+    restart: always
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      # kong.yml routes to auth:9999 — GoTrue defaults to 8081 if this isn't
+      # set, which leaves every /auth/v1/* request 502ing.
+      GOTRUE_API_PORT: 9999
+      # supabase_auth_admin (not the postgres superuser) — the base image
+      # pre-configures this role's search_path to "auth", which is what
+      # GoTrue's runtime queries rely on (they use unqualified table names
+      # like `identities`, not `auth.identities`). Connecting as `postgres`
+      # instead left every request 500ing with "relation does not exist"
+      # even though the tables existed and migrations had run successfully.
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@db:5432/postgres
+      GOTRUE_SITE_URL: ${SITE_URL}
+      GOTRUE_JWT_SECRET: ${JWT_SECRET}
+      # Without this, GoTrue stamps an empty "role" claim into every issued
+      # JWT, and PostgREST rejects every REST request signed with it
+      # ("role \"\" does not exist") — including the app's post-login
+      # profile fetch, which is why sign-in appeared to fail.
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_EXTERNAL_URL: ${GOTRUE_EXTERNAL_URL}
+      GOTRUE_MAILER_AUTOCONFIRM: "true"
+      API_EXTERNAL_URL: ${API_EXTERNAL_URL}
+      GOTRUE_DB_DRIVER: postgres
+    networks:
+      - ecke-crm-network
+    depends_on:
+      - db
+
+  rest:
+    container_name: ecke-crm-rest
+    image: postgrest/postgrest:v12.0.1
+    restart: always
+    environment:
+      PGRST_DB_URI: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
+      PGRST_DB_SCHEMAS: public,storage,graphql_public
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+    networks:
+      - ecke-crm-network
+    depends_on:
+      - db
+
+  realtime:
+    container_name: ecke-crm-realtime
+    image: supabase/realtime:v2.30.23
+    restart: always
+    environment:
+      PORT: 4000
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: postgres
+      DB_AFTER_CONNECT_QUERY: "SET search_path TO _realtime"
+      DB_ENC_KEY: supabaserealtime
+      API_JWT_SECRET: ${JWT_SECRET}
+      SECRET_KEY_BASE: ${REALTIME_SECRET_KEY_BASE}
+      ERL_AFLAGS: -proto_dist inet_tcp
+      DNS_NODES: "''"
+      RLIMIT_NOFILE: "10000"
+      APP_NAME: realtime
+      SEED_SELF_HOST: "true"
+      RUN_JANITOR: "true"
+    networks:
+      - ecke-crm-network
+    depends_on:
+      - db
+
+  storage:
+    container_name: ecke-crm-storage
+    image: supabase/storage-api:v1.11.13
+    restart: always
+    environment:
+      ANON_KEY: ${ANON_KEY}
+      SERVICE_KEY: ${SERVICE_ROLE_KEY}
+      POSTGREST_URL: http://rest:3000
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
+      FILE_SIZE_LIMIT: "52428800"
+      STORAGE_BACKEND: file
+      FILE_STORAGE_BACKEND_PATH: /var/lib/storage
+      TENANT_ID: stub
+      REGION: stub
+      GLOBAL_S3_BUCKET: stub
+      ENABLE_IMAGE_TRANSFORMATION: "false"
+    volumes:
+      - ./volumes/storage:/var/lib/storage
+    networks:
+      - ecke-crm-network
+    depends_on:
+      - db
+      - rest
+
+  meta:
+    container_name: ecke-crm-meta
+    image: supabase/postgres-meta:v0.84.2
+    restart: always
+    environment:
+      PG_META_PORT: 8080
+      PG_META_DB_HOST: db
+      PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD}
+    networks:
+      - ecke-crm-network
+    depends_on:
+      - db
+
+  # Deno runtime for supabase/functions/*. The old stack had no functions
+  # runtime and no Kong /functions/v1 route, which is why generate-pdf /
+  # set-jmap-secret / sync-contacts / sync-calendar were never invokable
+  # end-to-end. This runs ONE entrypoint — supabase/functions/main/index.ts —
+  # which spawns a worker per request keyed on the first path segment.
+  # TODO(phase-1): live-test each function through Kong with a real JWT; pin
+  # the edge-runtime image + main dispatcher API together when bumping.
+  edge-functions:
+    container_name: ecke-crm-edge-functions
+    image: supabase/edge-runtime:v1.67.4
+    restart: always
+    environment:
+      JWT_SECRET: ${JWT_SECRET}
+      SUPABASE_URL: http://kong:8000
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
+      SUPABASE_DB_URL: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
+      # Optional local/test override for the JMAP sync functions. Unset => they
+      # fall back to company_settings.jmap_* + Supabase Vault, as before.
+      # (see supabase/functions/.env.example)
+      JMAP_ENDPOINT: ${JMAP_ENDPOINT:-}
+      JMAP_USERNAME: ${JMAP_USERNAME:-}
+      JMAP_API_KEY: ${JMAP_API_KEY:-}
+    volumes:
+      - ../../supabase/functions:/home/deno/functions:ro
+    command:
+      - start
+      - --main-service
+      - /home/deno/functions/main
+    networks:
+      - ecke-crm-network
+    depends_on:
+      - db
+
+  studio:
+    container_name: ecke-crm-studio
+    image: supabase/studio:20240729-ce42139
+    restart: always
+    environment:
+      # Server-side calls (studio's own Next.js API routes) go through Kong
+      # on the docker network; SUPABASE_PUBLIC_URL is what the browser uses.
+      SUPABASE_URL: http://kong:8000
+      SUPABASE_PUBLIC_URL: ${SUPABASE_PUBLIC_URL}
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
+      AUTH_JWT_SECRET: ${JWT_SECRET}
+      # Required for the Table Editor / schema views — without this Studio
+      # can't reach postgres-meta and crash-loops on requests that need it.
+      STUDIO_PG_META_URL: http://meta:8080
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      DEFAULT_ORGANIZATION_NAME: "ecke.Solutions"
+      DEFAULT_PROJECT_NAME: "ecke-crm"
+    # No host port: only reachable through kong, behind the basic-auth gate in
+    # kong.yml. Publishing 3000 directly here is what bypassed that gate before.
+    networks:
+      - ecke-crm-network
+    depends_on:
+      - meta
+      - rest
+
+  kong:
+    container_name: ecke-crm-kong
+    image: kong:3.4
+    restart: always
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /var/lib/kong/kong.yml
+    volumes:
+      # Copy ../kong.yml.example to ./volumes/api/kong.yml (gitignored) and fill
+      # in the dashboard credentials — Kong's declarative loader doesn't expand
+      # env vars and this image has no writable $HOME for a templated copy.
+      - ./volumes/api/kong.yml:/var/lib/kong/kong.yml
+    ports:
+      - "8000:8000"
+    networks:
+      - ecke-crm-network
+    depends_on:
+      - auth
+      - rest
+      - realtime
+      - storage
+      - meta
+      - studio
+      - edge-functions
+
+networks:
+  ecke-crm-network:
+    driver: bridge
