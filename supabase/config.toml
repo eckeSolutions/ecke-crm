@@ -42,14 +42,10 @@ port = 54324
 [storage]
 enabled = true
 file_size_limit = "50MiB"
-
-[storage.buckets.invoice-pdfs]
-public = false
-file_size_limit = "10MiB"
-allowed_mime_types = ["application/pdf"]
-# The bucket + its RLS also come from migration 20260802010000; this block
-# just lets `supabase db reset` recreate it locally without the migration
-# needing storage-admin privileges.
+# The invoice-pdfs bucket + its RLS are created by the schema migration
+# (INSERT INTO storage.buckets ... ON CONFLICT DO NOTHING), so it is not
+# declared here — a [storage.buckets.*] block would make `db reset` prompt
+# to overwrite the migration-created bucket every run.
 
 [auth]
 enabled = true

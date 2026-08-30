@@ -24,7 +24,7 @@ Flutter-specific. Single-tenant: `admin` + `employee` roles, per-user RLS, no
 ```
 supabase/
   config.toml             # Supabase CLI link (the old repo had none)
-  migrations/              # 2 files — squashed current-state schema (see below)
+  migrations/              # 1 file — squashed current-state schema (see below)
   functions/              # 4 Edge Functions (JMAP sync + PDF) + main/ dispatcher
 infrastructure/supabase/  # the self-hosted stack (Hetzner + Coolify), project "ecke-crm"
   docker-compose.yml      # + NEW edge-functions service; containers ecke-crm-*
@@ -35,20 +35,32 @@ infrastructure/supabase/  # the self-hosted stack (Hetzner + Coolify), project "
 
 ### Migrations
 
-Squashed from the old repo's 9 incremental migrations + 2 corrections into a single
-current-state schema. The old project's granular history stays in *its* git — a
-greenfield repo with no production data to preserve doesn't need to replay it.
+Squashed from the old repo's 9 incremental migrations into **one** current-state
+schema. The old project's granular history stays in *its* git — a greenfield repo
+with no production data to preserve doesn't need to replay it.
 
-| File | What |
-|---|---|
-| `20260101000000_initial_schema.sql` | Everything: extensions, 9 tables in final form, `is_admin()` + 32 RLS policies, 12 triggers, 4 RPCs, `invoice_number_seq` (starts 422), the `invoice-pdfs` bucket + policy, the single `company_settings` row. Folds in the two fixes: explicit `CREATE EXTENSION "uuid-ossp"` (the old schema left it commented, relying on the `supabase/postgres` image), and an `AFTER INSERT/DELETE ON invoice_items` trigger keeping `time_entries.is_invoiced` / `invoice_id` in sync (documented in the old `docs/DATABASE_SCHEMA.md`, never migrated — the Flutter client patched it in app code). |
-| `20260101000100_auth_mfa_phone.sql` | Verbatim from the old `…_add_mfa_phone_config.up.sql`. Separate because it alters GoTrue's own `auth.*` tables, not the app schema. Phone MFA available, not enforced. |
+**`20260101000000_initial_schema.sql`** — everything: extensions, 9 tables in final
+form, `is_admin()` + 32 RLS policies, 12 triggers, 4 RPCs, `invoice_number_seq`
+(starts 422), the `invoice-pdfs` bucket + policy, the single `company_settings` row.
+Folds in two fixes:
 
-Smoke-tested against a stubbed `auth`/`storage` on a running `supabase/postgres`
-container: applies clean, RLS on all 9 tables, 15-min round-up fires, the new
-`invoice_items` → `time_entries` sync fires, first user is provisioned as `admin`,
-GoBD immutability rejects mutating an issued invoice. Full `supabase db reset` (real
-GoTrue/Storage system migrations) is the acceptance gate.
+- explicit `CREATE EXTENSION "uuid-ossp"` — the old schema left it commented, relying
+  on the `supabase/postgres` image preinstalling it;
+- an `AFTER INSERT/DELETE ON invoice_items` trigger keeping `time_entries.is_invoiced`
+  / `invoice_id` in sync — documented in the old `docs/DATABASE_SCHEMA.md`, never
+  migrated (the Flutter client patched it in app code).
+
+The old repo's `…_add_mfa_phone_config` migration was **dropped**: phone MFA
+(`auth.factor_type = 'phone'`, `auth.mfa_factors.phone`, …) is native in modern GoTrue.
+That file was a 2024 workaround for an older GoTrue and can't be applied by the CLI's
+non-superuser role anyway (`must be owner of type auth.factor_type`). The app's
+phone-MFA feature uses native GoTrue MFA — toggled via `[auth.mfa.phone]` in
+`config.toml`, no schema change.
+
+`supabase db reset` applies `20260101000000_initial_schema.sql` clean against a real
+Supabase stack (Postgres + GoTrue + Storage system migrations). An earlier stubbed
+smoke test also confirmed: RLS on all 9 tables, 15-min round-up, the new
+`invoice_items` → `time_entries` sync, first-user-is-admin, GoBD immutability.
 
 ### Edge Functions
 
@@ -78,7 +90,7 @@ Isolated from any other stack: containers are `supabase_*_ecke-crm`, ports 54321
 ```bash
 # from repo root; no global install needed
 npx --yes supabase@latest start        # first run pulls images (multi-GB)
-npx --yes supabase@latest db reset     # applies both migrations from scratch
+npx --yes supabase@latest db reset     # applies the schema migration from scratch
 ```
 
 Expect 0 errors, then (Studio at http://127.0.0.1:54323, or the printed DB URL):
