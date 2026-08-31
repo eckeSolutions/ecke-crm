@@ -6,10 +6,46 @@ clients, contacts, time tracking, GoBD-compliant invoicing, a simple income/expe
 ledger, company settings.
 
 Architecture plan: `~/.claude/plans/i-pivoted-form-a-sparkling-scott.md`.
-Source repos it draws from: `../ecke.Solutions CRM_old` (old Flutter app + backend),
-`../ecke.Solutions Design System` (the Stencil component library).
+Source repos it draws from: `../ecke.Solutions CRM_old` (retired Flutter app — the
+backend was lifted from it, see below), and the design system, vendored as a pinned
+submodule at `vendor/design-system/` (see [Design system](#design-system)).
 
 **Status:** Phase 1 (backend) in progress. The React app (Phase 2+) does not exist yet.
+
+---
+
+## Design system
+
+`vendor/design-system/` is a git submodule pinned to a tagged release of
+[eckeSolutions/ecke.Solutions-Design-System](https://github.com/eckeSolutions/ecke.Solutions-Design-System)
+— currently **`v0.2.0`**. This replaces the old hand-copied brand CSS values; the pin
+is bumped deliberately, never floating.
+
+```bash
+git clone --recurse-submodules https://github.com/eckeSolutions/ecke-crm.git
+# or, in an existing clone:
+git submodule update --init
+```
+
+Phase 2 (the React PWA) consumes it directly — no build step of its own:
+
+- **Design tokens** — import `vendor/design-system/tokens/*.css` (`colors`, `spacing`,
+  `typography`, `fonts`), or the bundled `vendor/design-system/styles.css` which also
+  pulls in `components/components.css`. Every value in the app is a `var(--token)` from
+  these files. Dark-only — no light mode, no `prefers-color-scheme` branch.
+- **Components** — the framework-agnostic Stencil web components under
+  `vendor/design-system/stencil/` (separate npm project, see its own `readme.md`).
+  `stencil/` is the single owned component library; ship none of Ionic's.
+
+Bumping the pin when a new tag lands:
+
+```bash
+git -C vendor/design-system fetch --tags
+git -C vendor/design-system checkout vX.Y.Z
+git add vendor/design-system && git commit -m "chore: bump design-system to vX.Y.Z"
+```
+
+`vendor/design-system/CHANGELOG.md` tracks what changed between tags.
 
 ---
 
