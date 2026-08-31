@@ -5,12 +5,14 @@ Flutter/Dart app. A private, self-hosted CRM for a German Kleinunternehmer (§19
 clients, contacts, time tracking, GoBD-compliant invoicing, a simple income/expense
 ledger, company settings.
 
-Architecture plan: `~/.claude/plans/i-pivoted-form-a-sparkling-scott.md`.
+Architecture plan: `~/.claude/plans/i-pivoted-form-a-sparkling-scott.md` (rationale).
+Sequenced work: [`ROADMAP.md`](ROADMAP.md).
 Source repos it draws from: `../ecke.Solutions CRM_old` (retired Flutter app — the
 backend was lifted from it, see below), and the design system, vendored as a pinned
 submodule at `vendor/design-system/` (see [Design system](#design-system)).
 
 **Status:** Phase 1 (backend) in progress. The React app (Phase 2+) does not exist yet.
+See [`ROADMAP.md`](ROADMAP.md) for the phase breakdown and locked decisions.
 
 ---
 
