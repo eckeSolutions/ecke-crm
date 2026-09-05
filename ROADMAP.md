@@ -59,15 +59,29 @@ whose React wrappers render with the dark theme applied.
 - [ ] **Live-test each Edge Function** through Kong with a real JWT — especially JMAP
       (`sync-contacts` / `sync-calendar`) against a running Stalwart, and
       `set-jmap-secret` writing a Vault secret.
-- [ ] `generate-pdf`: add font embedding (Asap / Source Sans 3), text wrapping, and
-      multi-page pagination. Confirm it is the **single** PDF renderer (no client-side
-      builder — the old app's drift trap).
-- [ ] Dedupe `resolveJmapCredentials()` into `supabase/functions/_shared/`.
+- [ ] `generate-pdf`: add font embedding (Asap / Source Sans 3) — text wrapping and
+      multi-page pagination are done (word-wrapped descriptions, page breaks that
+      repeat the table header + footer). Confirm it is the **single** PDF renderer (no
+      client-side builder — the old app's drift trap).
+- [x] Dedupe `resolveJmapCredentials()` into `supabase/functions/_shared/`.
 - [ ] Bump the far-behind image set (`postgres:15.1.1.78`, `gotrue`, `postgrest`,
       `realtime`, `studio`); decide Postgres 15 → 17. Contained sub-task, DB backup
-      first — don't let it block the function work.
+      first — don't let it block the function work. **Checked 5 Sep 2026:** upstream
+      `supabase/supabase`'s own compose has moved past a same-shape bump — Kong is
+      replaced by `envoyproxy/envoy` (Kong kept only as a network alias for
+      compatibility) and a `supavisor` pooler was added, Postgres now defaults to 17.x,
+      and PostgREST/Realtime/Storage have each jumped 2+ major versions. Needs a
+      deliberate pass against a running stack (`docker compose up` + `db reset` to
+      verify), not a blind tag swap — do this with Docker available, not blocked-and-
+      guessed.
 - [ ] Secrets hygiene: obvious placeholders in every tracked `*.example`; rotate the
-      real-looking Stalwart key in the git-ignored `supabase/functions/.env`.
+      real-looking Stalwart key in the git-ignored `supabase/functions/.env`. **Checked
+      5 Sep 2026:** every tracked `*.example` in this repo is already a placeholder —
+      no real secret is tracked. `supabase/functions/.env` doesn't exist in *this* repo;
+      the real Stalwart key this bullet means is the one still sitting in
+      `ecke.Solutions CRM_old/supabase/functions/.env` on this machine. Rotating it
+      needs the Stalwart admin console — a manual, owner action, not something to do
+      unattended from here.
 - [ ] Realtime `invalid_schema_name` crash — **optional**, online-first doesn't need it.
 
 **Done when:** a clean stack comes up, all 4 functions return correctly through Kong,

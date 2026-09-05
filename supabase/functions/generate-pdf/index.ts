@@ -8,16 +8,15 @@
 // before relying on this in production, same caveat as
 // supabase/functions/set-jmap-secret/index.ts.
 //
-// Known layout gaps versus the client-side renderer this mirrors
+// Known layout gap versus the client-side renderer this mirrors
 // (apps/ecke_crm/lib/features/invoicing/pdf/invoice_pdf_builder.dart):
 //   - Uses Helvetica (a pdf-lib StandardFont), not the app's Nunito
-//     typeface — embedding a custom font needs a bundled .ttf, which is a
-//     separate follow-up, not blocking this issue's contract.
-//   - No text wrapping for long line-item descriptions, and no pagination
-//     for invoices with enough items to overflow one A4 page — both
-//     assumed rare at this business's scale (see docs/FEATURES.md), but
-//     worth fixing before this is relied on for an unusually large
-//     invoice.
+//     typeface — embedding a custom font needs a bundled .ttf/.woff2, which
+//     is a separate follow-up, not blocking this issue's contract.
+// Long line-item descriptions now wrap (word-wrapped against the
+// description column's width) and invoices that overflow one A4 page
+// continue onto further pages, each repeating the table header and the
+// footer — see wrapText() / beginNewPage() below.
 //
 // Error envelope matches docs/API_CONTRACTS.md: non-2xx status with
 // { "error": { "code": "...", "message": "..." } }.
@@ -26,6 +25,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import {
   PDFDocument,
   PDFFont,
+  PDFPage,
   rgb,
   StandardFonts,
 } from "npm:pdf-lib@1.17.1";
@@ -63,6 +63,29 @@ function formatDateDe(iso: string): string {
 
 function formatQuantity(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(".", ",");
+}
+
+// Greedy word-wrap: fills each line up to maxWidth, breaking on whitespace.
+// A single word wider than maxWidth is left to overflow rather than being
+// split mid-word — line-item descriptions are natural-language text, not
+// unbroken tokens, so this is assumed not to occur in practice.
+function wrapText(text: string, font: PDFFont, size: number, maxWidth: number): string[] {
+  const words = text.split(/\s+/).filter(Boolean);
+  if (words.length === 0) return [""];
+
+  const lines: string[] = [];
+  let current = words[0];
+  for (let i = 1; i < words.length; i++) {
+    const candidate = `${current} ${words[i]}`;
+    if (font.widthOfTextAtSize(candidate, size) <= maxWidth) {
+      current = candidate;
+    } else {
+      lines.push(current);
+      current = words[i];
+    }
+  }
+  lines.push(current);
+  return lines;
 }
 
 // -- Brand colors, matching InvoicePdfBuilder's PdfColor constants --
@@ -121,11 +144,21 @@ function senderAddressLine(letterhead: BuildPdfArgs["letterhead"]): string {
   return [letterhead.street, cityLine].filter((p) => p && p.length > 0).join(" · ");
 }
 
+const PAGE_WIDTH = 595.28; // A4, points
+const PAGE_HEIGHT = 841.89;
+const ITEM_LINE_HEIGHT = 14;
+// Lowest y a table row (or the total block) may start at before the page
+// break kicks in -- leaves clearance above the footer's hairline (drawn at
+// footerY + 12, footerY = 64) plus a small buffer.
+const CONTENT_BOTTOM_Y = 100;
+// Rough worst-case height of the "total + § 19 notice" block that must
+// follow the last item row: top-border gap (10) + gap (10) + total line
+// (16) + notice gap+2 lines (16 + 13) = 65, rounded up for headroom.
+const TOTAL_BLOCK_HEIGHT = 75;
+
 async function buildInvoicePdf(args: BuildPdfArgs): Promise<Uint8Array> {
   const { invoice, client, items, letterhead } = args;
   const doc = await PDFDocument.create();
-  const page = doc.addPage([595.28, 841.89]); // A4, points
-  const { width, height } = page.getSize();
 
   const font = await doc.embedFont(StandardFonts.Helvetica);
   const fontBold = await doc.embedFont(StandardFonts.HelveticaBold);
@@ -134,8 +167,22 @@ async function buildInvoicePdf(args: BuildPdfArgs): Promise<Uint8Array> {
   const marginLeft = 48;
   const marginRight = 48;
   const contentLeft = marginLeft;
-  const contentRight = width - marginRight;
-  let y = height - 44;
+  const contentRight = PAGE_WIDTH - marginRight;
+
+  const colPos = contentLeft;
+  const colDesc = colPos + 24;
+  const colQtyRight = contentRight - 76 - 70;
+  const colPriceRight = contentRight - 76;
+  const colTotalRight = contentRight;
+  const descMaxWidth = colQtyRight - colDesc - 12;
+  const companyName = letterhead.company_name ?? "ecke.Solutions";
+
+  // `page` and `y` are reassigned by beginNewPage() -- the draw* helpers
+  // below close over these `let` bindings so every call draws onto
+  // whichever page is current, not the page that existed when the helper
+  // was defined.
+  let page: PDFPage = doc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+  let y = PAGE_HEIGHT - 44;
 
   const drawText = (
     text: string,
@@ -154,9 +201,60 @@ async function buildInvoicePdf(args: BuildPdfArgs): Promise<Uint8Array> {
   const drawHLine = (x1: number, x2: number, lineY: number, color = COLOR_HAIRLINE, thickness = 1) =>
     page.drawLine({ start: { x: x1, y: lineY }, end: { x: x2, y: lineY }, thickness, color });
 
+  // Footer is redrawn on every page (not just the last) so a page that
+  // gets separated from the rest still identifies the sender -- drawn
+  // against an explicit page argument, since it must finalize the *outgoing*
+  // page from inside beginNewPage(), before `page` is reassigned.
+  const drawFooterOn = (targetPage: PDFPage) => {
+    const footerY = 44 + 20;
+    targetPage.drawLine({
+      start: { x: contentLeft, y: footerY + 12 },
+      end: { x: contentRight, y: footerY + 12 },
+      thickness: 1,
+      color: COLOR_HAIRLINE,
+    });
+    const footerLeft = letterhead.tax_number
+      ? `${companyName}\nSteuernummer: ${letterhead.tax_number}`
+      : companyName;
+    footerLeft.split("\n").forEach((line, i) => {
+      targetPage.drawText(line, { x: contentLeft, y: footerY - i * 11, size: 9, font, color: COLOR_FOOTER_GRAY });
+    });
+    if (letterhead.iban) {
+      const label = `IBAN: ${letterhead.iban}`;
+      const w = font.widthOfTextAtSize(label, 9);
+      targetPage.drawText(label, { x: contentRight - w, y: footerY, size: 9, font, color: COLOR_FOOTER_GRAY });
+    }
+  };
+
+  // Column header row -- drawn once on page 1 and again at the top of every
+  // continuation page, so a reader can tell what each column means without
+  // flipping back to page 1.
+  const drawTableHeader = () => {
+    drawHLine(contentLeft, contentRight, y + 7, COLOR_INK, 1.5);
+    drawText("Pos.", colPos, y - 7, fontBold, 11, COLOR_INK);
+    drawText("Beschreibung", colDesc, y - 7, fontBold, 11, COLOR_INK);
+    drawRight("Menge", colQtyRight, y - 7, fontBold, 11, COLOR_INK);
+    drawRight("Preis", colPriceRight, y - 7, fontBold, 11, COLOR_INK);
+    drawRight("Gesamt", colTotalRight, y - 7, fontBold, 11, COLOR_INK);
+    y -= 25;
+    drawHLine(contentLeft, contentRight, y + 7, COLOR_HAIRLINE);
+  };
+
+  // Finalizes the current page (footer) and starts a fresh one with a
+  // lightweight "Rechnung Nr. X — Fortsetzung" header, optionally
+  // repeating the table's column header row.
+  const beginNewPage = (withTableHeader: boolean) => {
+    drawFooterOn(page);
+    page = doc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+    y = PAGE_HEIGHT - 44;
+    drawText(`Rechnung Nr. ${invoice.invoice_number}`, contentLeft, y, fontBold, 14, COLOR_INK);
+    drawRight("Fortsetzung", contentRight, y, font, 11, COLOR_MUTED);
+    y -= 30;
+    if (withTableHeader) drawTableHeader();
+  };
+
   // -- Header: wordmark left, company name + address right --
   const senderAddr = senderAddressLine(letterhead);
-  const companyName = letterhead.company_name ?? "ecke.Solutions";
 
   drawText("ecke", contentLeft, y, fontBoldItalic, 20, COLOR_ECKE_BLUE);
   const eckeWidth = fontBoldItalic.widthOfTextAtSize("ecke", 20);
@@ -203,32 +301,33 @@ async function buildInvoicePdf(args: BuildPdfArgs): Promise<Uint8Array> {
   y -= 18 + 18; // gap + header row height
 
   // -- Item table --
-  const colPos = contentLeft;
-  const colDesc = colPos + 24;
-  const colQtyRight = contentRight - 76 - 70;
-  const colPriceRight = contentRight - 76;
-  const colTotalRight = contentRight;
-  const rowHeight = 25;
+  drawTableHeader();
 
-  drawHLine(contentLeft, contentRight, y + 7, COLOR_INK, 1.5);
-  drawText("Pos.", colPos, y - 7, fontBold, 11, COLOR_INK);
-  drawText("Beschreibung", colDesc, y - 7, fontBold, 11, COLOR_INK);
-  drawRight("Menge", colQtyRight, y - 7, fontBold, 11, COLOR_INK);
-  drawRight("Preis", colPriceRight, y - 7, fontBold, 11, COLOR_INK);
-  drawRight("Gesamt", colTotalRight, y - 7, fontBold, 11, COLOR_INK);
-  y -= rowHeight;
-  drawHLine(contentLeft, contentRight, y + 7, COLOR_HAIRLINE);
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    const descLines = wrapText(item.description, font, 11.5, descMaxWidth);
+    // 7 top padding + one 14pt line per wrapped line + 4 bottom padding --
+    // for a single-line description this is 25, matching the fixed
+    // rowHeight the unwrapped layout used before.
+    const rowHeightNeeded = 11 + descLines.length * ITEM_LINE_HEIGHT;
 
-  items.forEach((item, i) => {
+    if (y - rowHeightNeeded < CONTENT_BOTTOM_Y) {
+      beginNewPage(true);
+    }
+
     const rowY = y - 7;
     drawText(`${i + 1}`, colPos, rowY, font, 11.5, COLOR_INK);
-    drawText(item.description, colDesc, rowY, font, 11.5, COLOR_INK);
+    descLines.forEach((line, li) => drawText(line, colDesc, rowY - li * ITEM_LINE_HEIGHT, font, 11.5, COLOR_INK));
     drawRight(formatQuantity(item.quantity), colQtyRight, rowY, font, 11.5, COLOR_INK);
     drawRight(formatEuro(item.unit_price), colPriceRight, rowY, font, 11.5, COLOR_INK);
     drawRight(formatEuro(item.line_total), colTotalRight, rowY, font, 11.5, COLOR_INK);
-    y -= rowHeight;
+    y -= rowHeightNeeded;
     drawHLine(contentLeft, contentRight, y + 7, COLOR_ROW_DIVIDER);
-  });
+  }
+
+  if (y - TOTAL_BLOCK_HEIGHT < CONTENT_BOTTOM_Y) {
+    beginNewPage(false);
+  }
 
   y -= 10; // gap before the total row's top border
   drawHLine(contentRight - 200, contentRight, y + 3, COLOR_INK, 1.5);
@@ -242,18 +341,7 @@ async function buildInvoicePdf(args: BuildPdfArgs): Promise<Uint8Array> {
   drawText("Gemäß § 19 UStG wird keine Umsatzsteuer berechnet.", contentLeft, y, font, 10.5, COLOR_MUTED);
   drawText(noticeLine2, contentLeft, y - 13, font, 10.5, COLOR_MUTED);
 
-  // -- Footer, pinned near the bottom margin --
-  const footerY = 44 + 20;
-  drawHLine(contentLeft, contentRight, footerY + 12, COLOR_HAIRLINE);
-  const footerLeft = letterhead.tax_number
-    ? `${companyName}\nSteuernummer: ${letterhead.tax_number}`
-    : companyName;
-  footerLeft.split("\n").forEach((line, i) => {
-    drawText(line, contentLeft, footerY - i * 11, font, 9, COLOR_FOOTER_GRAY);
-  });
-  if (letterhead.iban) {
-    drawRight(`IBAN: ${letterhead.iban}`, contentRight, footerY, font, 9, COLOR_FOOTER_GRAY);
-  }
+  drawFooterOn(page);
 
   return doc.save();
 }

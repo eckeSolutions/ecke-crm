@@ -34,10 +34,8 @@
 // above was plain curl, not this code running through `service_role`/RLS.
 //
 // Credentials: same JMAP_API_KEY/JMAP_ENDPOINT env var override, falling
-// back to company_settings/Vault, as sync-contacts (issue #4) -- see that
-// file's resolveJmapCredentials() for the fuller explanation; duplicated
-// here rather than shared, matching this repo's one-file-per-function
-// convention (no `_shared` module exists for Edge Functions here).
+// back to company_settings/Vault, as sync-contacts (issue #4) -- see
+// _shared/jmap.ts's resolveJmapCredentials() for the fuller explanation.
 //
 // Scope: `direction: "push"` sends one time_entries row (by id). `pull`
 // lists candidate JMAP events; it does not create a time_entries row from
@@ -49,6 +47,7 @@
 // { "error": { "code": "...", "message": "..." } }.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { resolveJmapCredentials } from "../_shared/jmap.ts";
 
 function errorResponse(status: number, code: string, message: string): Response {
   return new Response(JSON.stringify({ error: { code, message } }), {
@@ -77,55 +76,6 @@ interface JmapSession {
   apiUrl: string;
   accounts?: Record<string, unknown>;
   primaryAccounts?: Record<string, string>;
-}
-
-interface JmapCredentials {
-  endpoint: string;
-  secret: string;
-}
-
-// Duplicated from sync-contacts/index.ts -- see that file's copy for the
-// full explanation (issue #4). Kept identical on purpose.
-async function resolveJmapCredentials(
-  supabaseUrl: string,
-  serviceRoleKey: string,
-): Promise<{ credentials?: JmapCredentials; errorCode?: string; errorMessage?: string }> {
-  const envApiKey = Deno.env.get("JMAP_API_KEY");
-  if (envApiKey) {
-    const envEndpoint = Deno.env.get("JMAP_ENDPOINT");
-    if (!envEndpoint) {
-      return {
-        errorCode: "jmap_not_configured",
-        errorMessage: "JMAP_API_KEY is set but JMAP_ENDPOINT is not (see supabase/functions/.env.example).",
-      };
-    }
-    return { credentials: { endpoint: envEndpoint, secret: envApiKey } };
-  }
-
-  const adminClient = createClient(supabaseUrl, serviceRoleKey);
-  const { data: settings, error: settingsError } = await adminClient
-    .from("company_settings")
-    .select("jmap_endpoint, jmap_secret_id")
-    .eq("id", true)
-    .single();
-  if (settingsError || !settings?.jmap_endpoint || !settings.jmap_secret_id) {
-    return {
-      errorCode: "jmap_not_configured",
-      errorMessage: "JMAP is not configured (missing jmap_endpoint or jmap_secret_id on company_settings).",
-    };
-  }
-
-  const { data: secretRow, error: secretError } = await adminClient
-    .schema("vault")
-    .from("decrypted_secrets")
-    .select("decrypted_secret")
-    .eq("id", settings.jmap_secret_id)
-    .single();
-  if (secretError || !secretRow?.decrypted_secret) {
-    return { errorCode: "jmap_secret_unresolved", errorMessage: "Could not resolve the JMAP credential from Vault." };
-  }
-
-  return { credentials: { endpoint: settings.jmap_endpoint, secret: secretRow.decrypted_secret } };
 }
 
 async function jmapCall(

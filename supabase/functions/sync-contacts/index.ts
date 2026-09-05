@@ -70,14 +70,15 @@
 //
 // CREDENTIALS (issue #4): `JMAP_API_KEY`/`JMAP_ENDPOINT` env vars, if set,
 // are used directly instead of the `company_settings`/Vault lookup --
-// see resolveJmapCredentials() below. Local/test convenience; the
-// Settings-UI-driven path is unchanged when they're unset. See
+// see resolveJmapCredentials() in _shared/jmap.ts. Local/test convenience;
+// the Settings-UI-driven path is unchanged when they're unset. See
 // supabase/functions/.env.example.
 //
 // Error envelope matches docs/API_CONTRACTS.md: non-2xx status with
 // { "error": { "code": "...", "message": "..." } }.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { resolveJmapCredentials } from "../_shared/jmap.ts";
 
 function errorResponse(status: number, code: string, message: string): Response {
   return new Response(JSON.stringify({ error: { code, message } }), {
@@ -120,66 +121,6 @@ interface ClientRow {
   mobile_2: string | null;
   stalwart_contact_id: string | null;
   last_contact_sync_at: string | null;
-}
-
-interface JmapCredentials {
-  endpoint: string;
-  secret: string;
-}
-
-// Resolves the endpoint + Bearer secret to talk to Stalwart with. Prefers
-// JMAP_API_KEY/JMAP_ENDPOINT env vars (issue #4, local/test convenience)
-// over the company_settings/Vault path so local iteration doesn't require
-// seeding the DB by hand -- falls back to the DB+Vault path, unchanged,
-// when the env var isn't set.
-async function resolveJmapCredentials(
-  supabaseUrl: string,
-  serviceRoleKey: string,
-): Promise<{ credentials?: JmapCredentials; errorCode?: string; errorMessage?: string }> {
-  const envApiKey = Deno.env.get("JMAP_API_KEY");
-  if (envApiKey) {
-    const envEndpoint = Deno.env.get("JMAP_ENDPOINT");
-    if (!envEndpoint) {
-      return {
-        errorCode: "jmap_not_configured",
-        errorMessage: "JMAP_API_KEY is set but JMAP_ENDPOINT is not (see supabase/functions/.env.example).",
-      };
-    }
-    return { credentials: { endpoint: envEndpoint, secret: envApiKey } };
-  }
-
-  // company_settings is admin-only RLS -- read via service_role
-  // regardless of the caller's own role, same split set-jmap-secret uses.
-  const adminClient = createClient(supabaseUrl, serviceRoleKey);
-  const { data: settings, error: settingsError } = await adminClient
-    .from("company_settings")
-    .select("jmap_endpoint, jmap_secret_id")
-    .eq("id", true)
-    .single();
-  if (settingsError || !settings?.jmap_endpoint || !settings.jmap_secret_id) {
-    return {
-      errorCode: "jmap_not_configured",
-      errorMessage: "JMAP is not configured (missing jmap_endpoint or jmap_secret_id on company_settings).",
-    };
-  }
-
-  // First Vault *read* in this repo -- set-jmap-secret only ever writes.
-  // `vault.decrypted_secrets` is a view; verify this shape against your
-  // project's installed supabase_vault extension version, same caveat
-  // set-jmap-secret already carries for its own vault RPC calls. This
-  // holds a Stalwart API Key secret, not an account password -- see the
-  // file header (issue #3).
-  const { data: secretRow, error: secretError } = await adminClient
-    .schema("vault")
-    .from("decrypted_secrets")
-    .select("decrypted_secret")
-    .eq("id", settings.jmap_secret_id)
-    .single();
-  if (secretError || !secretRow?.decrypted_secret) {
-    return { errorCode: "jmap_secret_unresolved", errorMessage: "Could not resolve the JMAP credential from Vault." };
-  }
-
-  return { credentials: { endpoint: settings.jmap_endpoint, secret: secretRow.decrypted_secret } };
 }
 
 // JSContact-shaped (RFC 9553) ContactCard properties for an individual
