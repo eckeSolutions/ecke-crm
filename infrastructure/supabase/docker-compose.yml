@@ -14,8 +14,46 @@ services:
     restart: always
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: postgres
+      PGDATABASE: postgres
+      # Consumed by db-init/jwt.sql -- reused from GoTrue's own var rather
+      # than adding a second "how long do JWTs live" knob.
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXP: ${GOTRUE_JWT_EXP}
     volumes:
       - ./volumes/db/data:/var/lib/postgresql/data
+      # Verified live 2026-09-05: without these, the image's baked-in role
+      # *creation* runs, but nothing ever ALTERs supabase_auth_admin /
+      # supabase_storage_admin / authenticator / pgbouncer to
+      # POSTGRES_PASSWORD -- auth and storage crash-loop on "password
+      # authentication failed" the moment they connect over the docker
+      # network (127.0.0.1 uses `trust` in pg_hba.conf and masks this on a
+      # same-container psql test; every other source CIDR requires
+      # scram-sha-256, where it actually surfaces). Realtime's
+      # "invalid_schema_name" crash (already noted below as optional) is the
+      # same root cause: no _supabase database / _realtime schema without
+      # _supabase.sql + realtime.sql. Mount order doesn't matter -- Postgres
+      # runs every /docker-entrypoint-initdb.d/**/*.sql in filename order
+      # (init-scripts/98-*, init-scripts/99-*, then migrations/97-*,
+      # migrations/99-*), and only on a first-time (empty) data directory.
+      - ./db-init/roles.sql:/docker-entrypoint-initdb.d/init-scripts/99-roles.sql:ro
+      - ./db-init/jwt.sql:/docker-entrypoint-initdb.d/init-scripts/99-jwt.sql:ro
+      - ./db-init/webhooks.sql:/docker-entrypoint-initdb.d/init-scripts/98-webhooks.sql:ro
+      - ./db-init/_supabase.sql:/docker-entrypoint-initdb.d/migrations/97-_supabase.sql:ro
+      - ./db-init/realtime.sql:/docker-entrypoint-initdb.d/migrations/99-realtime.sql:ro
+      - ./db-init/logs.sql:/docker-entrypoint-initdb.d/migrations/99-logs.sql:ro
+      - ./db-init/pooler.sql:/docker-entrypoint-initdb.d/migrations/99-pooler.sql:ro
+      # Persists pgsodium's root key across restarts -- supabase_vault
+      # (set-jmap-secret's vault.create_secret/update_secret) is built on
+      # pgsodium; without this the key regenerates per-restart and every
+      # previously stored secret stops decrypting.
+      - db-config:/etc/postgresql-custom
+    # Needed for `supabase db push --db-url postgresql://...@localhost:5432/...`
+    # (see README.md's self-hosted bring-up section) -- without this the host
+    # has no route to the DB at all, only containers on ecke-crm-network do.
+    ports:
+      - "5432:5432"
     networks:
       - ecke-crm-network
 
@@ -57,7 +95,12 @@ services:
     restart: always
     environment:
       PGRST_DB_URI: postgres://postgres:${POSTGRES_PASSWORD}@db:5432/postgres
-      PGRST_DB_SCHEMAS: public,storage,graphql_public
+      # Was hardcoded here (ignoring .env's PGRST_DB_SCHEMAS entirely) and
+      # missing `vault` -- set-jmap-secret's vault RPC calls and
+      # resolveJmapCredentials()'s vault read both 500 with "Invalid schema:
+      # vault" without it (verified live against the CLI's local stack,
+      # 2026-09-05; same PostgREST behavior applies here).
+      PGRST_DB_SCHEMAS: ${PGRST_DB_SCHEMAS}
       PGRST_JWT_SECRET: ${JWT_SECRET}
     networks:
       - ecke-crm-network
@@ -133,8 +176,8 @@ services:
   # set-jmap-secret / sync-contacts / sync-calendar were never invokable
   # end-to-end. This runs ONE entrypoint — supabase/functions/main/index.ts —
   # which spawns a worker per request keyed on the first path segment.
-  # TODO(phase-1): live-test each function through Kong with a real JWT; pin
-  # the edge-runtime image + main dispatcher API together when bumping.
+  # Live-tested through Kong with a real JWT 2026-09-05; pin the edge-runtime
+  # image + main dispatcher API together when bumping either.
   edge-functions:
     container_name: ecke-crm-edge-functions
     image: supabase/edge-runtime:v1.67.4
@@ -216,3 +259,6 @@ services:
 networks:
   ecke-crm-network:
     driver: bridge
+
+volumes:
+  db-config:

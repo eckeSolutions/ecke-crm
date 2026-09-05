@@ -161,7 +161,7 @@ cd infrastructure/supabase
 cp .env.example .env                      # set POSTGRES_PASSWORD; generate JWT_SECRET +
                                           # ANON_KEY + SERVICE_ROLE_KEY + REALTIME_SECRET_KEY_BASE;
                                           # set DASHBOARD_*
-cp ../kong.yml.example volumes/api/kong.yml   # set the two dashboard credentials
+cp ./kong.yml.example volumes/api/kong.yml    # set the two dashboard credentials
 docker compose up -d                      # -> ecke-crm-db, ecke-crm-kong, ...
 npx --yes supabase@latest db push --db-url "postgresql://postgres:<POSTGRES_PASSWORD>@localhost:5432/postgres"
 curl -sX POST http://localhost:8000/functions/v1/set-jmap-secret \

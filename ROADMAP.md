@@ -54,11 +54,38 @@ whose React wrappers render with the dark theme applied.
 - [x] Adopt the Supabase CLI (`config.toml` — the old repo had none).
 - [x] Wire an Edge Functions runtime container + Kong `/functions/v1` route into
       `infrastructure/supabase/`.
-- [ ] `supabase db reset` clean against a real stack; fix anything it surfaces.
-- [ ] Bring the self-hosted stack up; `supabase functions deploy` all 4.
-- [ ] **Live-test each Edge Function** through Kong with a real JWT — especially JMAP
-      (`sync-contacts` / `sync-calendar`) against a running Stalwart, and
-      `set-jmap-secret` writing a Vault secret.
+- [x] `supabase db reset` clean against a real stack; fix anything it surfaces.
+- [x] Bring the self-hosted stack up; `supabase functions deploy` all 4. **Done 5 Sep
+      2026** — surfaced and fixed real bugs along the way: `db`'s Postgres container was
+      missing the standard `db-init/*.sql` scripts (now committed) that `ALTER USER ...
+      WITH PASSWORD` the `supabase_auth_admin`/`storage_admin`/`authenticator`/
+      `pgbouncer` roles and create the `_realtime`/`_supabase` schemas — without them
+      `auth` and `storage` crash-loop on `password authentication failed` the moment
+      they connect over the docker network (`127.0.0.1` uses `trust` in `pg_hba.conf`
+      and masks this on a same-container test; every other source CIDR requires
+      `scram-sha-256`, where it actually surfaces), and this **is** the Realtime
+      `invalid_schema_name` crash noted below — now fixed, not just deemed optional.
+      Also added the missing `db` host port (`5432:5432`, needed for `db push`) and a
+      `db-config` named volume (persists pgsodium's key across restarts, so Vault
+      secrets keep decrypting). README's own `cp ../kong.yml.example` path was wrong
+      too (the file is at `infrastructure/supabase/kong.yml.example`, no `../`) — fixed.
+- [x] **Live-test each Edge Function** through Kong with a real JWT. **Done 5 Sep
+      2026**, against both the Supabase CLI's local stack and the actual self-hosted
+      `infrastructure/supabase/docker-compose.yml` stack (the latter specifically
+      exercises `supabase/functions/main/index.ts`'s `EdgeRuntime.userWorkers`
+      dispatcher, which the CLI stack bypasses entirely): `set-jmap-secret`'s
+      create-then-update Vault round-trip verified end to end; `sync-contacts` /
+      `sync-calendar` verified through real auth + RLS + `resolveJmapCredentials()`,
+      failing only at the expected boundary (no real Stalwart reachable from here);
+      `generate-pdf` rendered a real 35-item, 2-page invoice with a wrapped long
+      description — confirmed correct on read-back. Found and fixed two real bugs this
+      surfaced: (1) PostgREST wasn't exposing the `vault` schema at all
+      (`[api].schemas` / `PGRST_DB_SCHEMAS` — the self-hosted compose hardcoded a
+      literal that ignored `.env`'s value entirely, also fixed), so every Vault call
+      500'd with `Invalid schema: vault` before reaching Postgres; (2) `set-jmap-secret`
+      called `vault.update_secret` with a param named `id` — the installed
+      `supabase_vault` 0.3.1's actual signature uses `secret_id`, so PostgREST silently
+      404'd on unnamed-parameter mismatch instead of erroring on a type mismatch.
 - [ ] `generate-pdf`: add font embedding (Asap / Source Sans 3) — text wrapping and
       multi-page pagination are done (word-wrapped descriptions, page breaks that
       repeat the table header + footer). Confirm it is the **single** PDF renderer (no
@@ -82,11 +109,14 @@ whose React wrappers render with the dark theme applied.
       `ecke.Solutions CRM_old/supabase/functions/.env` on this machine. Rotating it
       needs the Stalwart admin console — a manual, owner action, not something to do
       unattended from here.
-- [ ] Realtime `invalid_schema_name` crash — **optional**, online-first doesn't need it.
+- [x] Realtime `invalid_schema_name` crash — was going to be left **optional**
+      (online-first doesn't need it), but turned out to be the same root cause as the
+      self-hosted bring-up bug above and got fixed for free.
 
 **Done when:** a clean stack comes up, all 4 functions return correctly through Kong,
 and `generate-pdf` produces a wrapped, paginated, §19-compliant A4 PDF into the
-`invoice-pdfs` bucket.
+`invoice-pdfs` bucket. **Met 5 Sep 2026** (font embedding is the one still-open item,
+tracked above) — see the checked items for what was verified and fixed to get there.
 
 ---
 

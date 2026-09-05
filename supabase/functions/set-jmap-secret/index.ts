@@ -7,13 +7,18 @@
 // architecture both forbid it; only a service_role Edge Function may touch
 // vault.decrypted_secrets / vault.create_secret / vault.update_secret).
 //
-// NOT DEPLOYED OR TESTED against a live instance in this environment (no
-// `supabase` CLI here, no Vault extension to verify against) — written
-// against Supabase's documented Vault SQL API
-// (vault.create_secret(new_secret, new_name, new_description) returns uuid,
-// vault.update_secret(id, new_secret, new_name, new_description)). Verify
-// the exact vault function signatures against your project's installed
-// `supabase_vault` extension version before relying on this in production.
+// Verified 2026-09-05 against a real local stack (supabase_vault 0.3.1):
+// vault.create_secret(new_secret, new_name, new_description, new_key_id)
+// returns uuid, vault.update_secret(secret_id, new_secret, new_name,
+// new_description, new_key_id) returns void -- the create path's param
+// names matched Supabase's docs, but update_secret's first param is
+// `secret_id`, not `id` as originally guessed here; PostgREST's RPC
+// matches named JSON body keys to the function's actual parameter names,
+// so the wrong name silently 404'd ("could not find function") rather
+// than erroring on a type mismatch. Also needed `vault` added to the
+// exposed schemas list (`[api].schemas` / `PGRST_DB_SCHEMAS`) -- without
+// it PostgREST rejects `.schema("vault")` calls with "Invalid schema:
+// vault" before ever reaching Postgres's own grants.
 //
 // Error envelope matches docs/API_CONTRACTS.md: non-2xx status with
 // { "error": { "code": "...", "message": "..." } }.
@@ -90,7 +95,7 @@ Deno.serve(async (req) => {
   let secretId: string;
   if (settings?.jmap_secret_id) {
     const { error: updateError } = await adminClient.schema("vault").rpc("update_secret", {
-      id: settings.jmap_secret_id,
+      secret_id: settings.jmap_secret_id,
       new_secret: secret,
     });
     if (updateError) {

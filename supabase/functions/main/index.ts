@@ -8,11 +8,13 @@
 //
 // Not used by `supabase functions serve` (the CLI has its own dispatcher) and
 // not deployed to hosted Supabase — it exists only for infrastructure/supabase/
-// docker-compose.yml's supabase-edge-functions service.
+// docker-compose.yml's edge-functions service.
 //
-// TODO(phase-1): verify end-to-end against the running stack — the
-// EdgeRuntime.userWorkers API surface tracks the pinned edge-runtime image
-// version; bump both together.
+// Verified end-to-end 2026-09-05 against a real self-hosted stack: routed
+// set-jmap-secret and sync-contacts correctly through Kong -> this dispatcher
+// -> EdgeRuntime.userWorkers -> the target function's own index.ts, including
+// resolving `../_shared/jmap.ts` from within a spawned worker. Still worth
+// re-checking this API surface when bumping the pinned edge-runtime image.
 
 Deno.serve(async (req: Request) => {
   const url = new URL(req.url);

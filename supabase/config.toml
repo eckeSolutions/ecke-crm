@@ -12,7 +12,7 @@ project_id = "ecke-crm"
 [api]
 enabled = true
 port = 54321
-schemas = ["public", "storage", "graphql_public"]
+schemas = ["public", "storage", "graphql_public", "vault"]
 extra_search_path = ["public", "extensions"]
 max_rows = 1000
 
@@ -35,7 +35,7 @@ port = 54323
 api_url = "http://127.0.0.1"
 
 # Local email testing (Auth confirmation / recovery mails land here, not a real inbox).
-[inbucket]
+[local_smtp]
 enabled = true
 port = 54324
 
