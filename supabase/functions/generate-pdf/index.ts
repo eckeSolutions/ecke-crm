@@ -1,34 +1,34 @@
 // generate-pdf — renders and stores the PDF for an invoice, per
 // docs/API_CONTRACTS.md §2 and issue #1.
 //
-// NOT DEPLOYED OR TESTED against a live instance in this environment (no
-// `supabase` CLI here, no Deno runtime to execute this against a real
-// project) — written against pdf-lib's documented API and Supabase's
-// documented Storage/RPC client surface. Verify against a live instance
-// before relying on this in production, same caveat as
-// supabase/functions/set-jmap-secret/index.ts.
+// Live-tested end to end through Kong against both the Supabase CLI's local
+// stack and the self-hosted infrastructure/supabase/docker-compose.yml stack
+// (6 Sep 2026): rendered a real invoice, stored it in the invoice-pdfs
+// bucket, and read the resulting object back through storage RLS — a valid
+// PDF 1.7 document.
 //
-// Known layout gap versus the client-side renderer this mirrors
-// (apps/ecke_crm/lib/features/invoicing/pdf/invoice_pdf_builder.dart):
-//   - Uses Helvetica (a pdf-lib StandardFont), not the app's Nunito
-//     typeface — embedding a custom font needs a bundled .ttf/.woff2, which
-//     is a separate follow-up, not blocking this issue's contract.
-// Long line-item descriptions now wrap (word-wrapped against the
-// description column's width) and invoices that overflow one A4 page
-// continue onto further pages, each repeating the table header and the
-// footer — see wrapText() / beginNewPage() below.
+// Long line-item descriptions wrap (word-wrapped against the description
+// column's width) and invoices that overflow one A4 page continue onto
+// further pages, each repeating the table header and the footer — see
+// wrapText() / beginNewPage() below.
+//
+// Fonts are the design system's own — see "-- Fonts --" below for why
+// body.woff2 needed a build-time step first, not a runtime embed
+// (regenerate via scripts/build-fonts.py after that file changes).
 //
 // Error envelope matches docs/API_CONTRACTS.md: non-2xx status with
 // { "error": { "code": "...", "message": "..." } }.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { PDFDocument, PDFFont, PDFPage, rgb } from "npm:pdf-lib@1.17.1";
+import fontkit from "npm:@pdf-lib/fontkit@1.1.1";
 import {
-  PDFDocument,
-  PDFFont,
-  PDFPage,
-  rgb,
-  StandardFonts,
-} from "npm:pdf-lib@1.17.1";
+  BODY_BOLD_B64,
+  BODY_REGULAR_B64,
+  WORDMARK_DOT_B64,
+  WORDMARK_ECKE_B64,
+  WORDMARK_SOLUTIONS_B64,
+} from "./assets/fonts.generated.ts";
 
 function errorResponse(status: number, code: string, message: string): Response {
   return new Response(JSON.stringify({ error: { code, message } }), {
@@ -156,13 +156,53 @@ const CONTENT_BOTTOM_Y = 100;
 // (16) + notice gap+2 lines (16 + 13) = 65, rounded up for headroom.
 const TOTAL_BLOCK_HEIGHT = 75;
 
+// -- Fonts --
+//
+// The design system's body face (assets/fonts/body.woff2, "Source Sans 3")
+// is a *variable* font whose wght axis defaults to 200 (ExtraLight) — fine
+// for CSS, which dials in a real weight per element, but pdf-lib/fontkit has
+// no public hook to pick a specific instance out of a variable font: embed
+// the file as-is and every glyph renders at its default instance, i.e. every
+// invoice in ExtraLight. So body-regular.ttf / body-bold.ttf here are NOT
+// copies of the design system's file — they're static wght=400 / wght=700
+// instances, produced once at build time with fontTools' varLib.instancer
+// (`pip install fonttools brotli`, then
+// `instantiateVariableFont(TTFont("body.woff2"), {"wght": 400|700})`,
+// `tt.flavor = None`, `tt.save(...)`) and committed here, since Deno's edge
+// runtime has no fonttools/harfbuzz to do that at request time. Regenerate
+// both if vendor/design-system's body.woff2 changes.
+//
+// The three wordmark faces need no instancing: tokens/fonts.css's
+// @font-face rules show they're each already a single static instance
+// (wght 420/660/580, one per wordmark part) — pre-instantiated the same way
+// upstream in the design system, not still-variable files. They still go
+// through the same build step as body-regular/body-bold, though, because
+// pdf-lib has a separate problem with .woff2 specifically: embedding one
+// as-is writes its raw WOFF2-*compressed* bytes into the PDF's font-program
+// stream instead of the decompressed sfnt that stream is specified to hold.
+// Chrome/Adobe tolerate it; MuPDF/FreeType don't ("FT_New_Memory_Face:
+// unknown file format", confirmed live 6 Sep 2026 rasterizing the output
+// with PyMuPDF). So every font here — instanced or not — is repacked to
+// plain sfnt (.ttf) by scripts/build-fonts.py before it ever reaches pdf-lib.
+//
+// All five are base64-inlined TypeScript constants (assets/fonts.generated.ts),
+// not sibling files read at request time — supabase/edge-runtime bundles a
+// function's module graph before running it and does not carry along
+// non-module files, so a plain Deno.readFile("./assets/...") 404s at request
+// time ("path not found: /var/tmp/sb-compile-edge-runtime/..."), confirmed
+// live 6 Sep 2026 against the self-hosted stack.
+const decodeBase64Font = (b64: string) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+
 async function buildInvoicePdf(args: BuildPdfArgs): Promise<Uint8Array> {
   const { invoice, client, items, letterhead } = args;
   const doc = await PDFDocument.create();
+  doc.registerFontkit(fontkit);
 
-  const font = await doc.embedFont(StandardFonts.Helvetica);
-  const fontBold = await doc.embedFont(StandardFonts.HelveticaBold);
-  const fontBoldItalic = await doc.embedFont(StandardFonts.HelveticaBoldOblique);
+  const font = await doc.embedFont(decodeBase64Font(BODY_REGULAR_B64));
+  const fontBold = await doc.embedFont(decodeBase64Font(BODY_BOLD_B64));
+  const wordmarkEcke = await doc.embedFont(decodeBase64Font(WORDMARK_ECKE_B64)); // italic, wght 420
+  const wordmarkDot = await doc.embedFont(decodeBase64Font(WORDMARK_DOT_B64)); // wght 660
+  const wordmarkSolutions = await doc.embedFont(decodeBase64Font(WORDMARK_SOLUTIONS_B64)); // wght 580
 
   const marginLeft = 48;
   const marginRight = 48;
@@ -256,11 +296,16 @@ async function buildInvoicePdf(args: BuildPdfArgs): Promise<Uint8Array> {
   // -- Header: wordmark left, company name + address right --
   const senderAddr = senderAddressLine(letterhead);
 
-  drawText("ecke", contentLeft, y, fontBoldItalic, 20, COLOR_ECKE_BLUE);
-  const eckeWidth = fontBoldItalic.widthOfTextAtSize("ecke", 20);
-  drawText(".", contentLeft + eckeWidth, y, fontBold, 20, COLOR_DOT);
-  const dotWidth = fontBold.widthOfTextAtSize(".", 20);
-  drawText("Solutions", contentLeft + eckeWidth + dotWidth, y, fontBold, 20, COLOR_NAVY);
+  // Matches components/components.css .wordmark: three parts, three
+  // dedicated static faces (see "-- Fonts --" above), not one face reused.
+  drawText("ecke", contentLeft, y, wordmarkEcke, 20, COLOR_ECKE_BLUE);
+  const eckeWidth = wordmarkEcke.widthOfTextAtSize("ecke", 20);
+  // --wm-dot-space: 0.05em of tracking after the dot, same token the CSS
+  // wordmark uses.
+  const dotSpace = 20 * 0.05;
+  drawText(".", contentLeft + eckeWidth, y, wordmarkDot, 20, COLOR_DOT);
+  const dotWidth = wordmarkDot.widthOfTextAtSize(".", 20) + dotSpace;
+  drawText("Solutions", contentLeft + eckeWidth + dotWidth, y, wordmarkSolutions, 20, COLOR_NAVY);
 
   drawRight(companyName, contentRight, y + 4, font, 10.5, COLOR_MUTED);
   if (senderAddr) drawRight(senderAddr, contentRight, y - 9, font, 10.5, COLOR_MUTED);

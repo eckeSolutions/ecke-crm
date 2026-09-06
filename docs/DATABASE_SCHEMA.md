@@ -144,6 +144,15 @@ configuration singleton, pinned by `id boolean PRIMARY KEY DEFAULT true` plus
 
 ## 2. Table reference
 
+Every primary key below is `uuid DEFAULT uuid_generate_v4()` (`profiles.id` is the one
+exception — it mirrors `auth.users.id` rather than generating its own). **UUIDv7 is an
+open question, not a decision** — raised 6 Sep 2026, tracked in
+[ROADMAP.md](../ROADMAP.md#open-questions). The case for it is entirely about a future
+*offline write* path (a sortable ID a client could generate for itself before ever
+reaching the server); this app has no such path today — see ROADMAP's "Offline" row —
+so there is nothing to gain from switching yet, only a one-time migration cost to pay
+later if that changes.
+
 ### `profiles` — app users, mirror of `auth.users`
 
 | Column | Type | Notes |

@@ -11,8 +11,9 @@ Source repos it draws from: `../ecke.Solutions CRM_old` (retired Flutter app —
 backend was lifted from it, see below), and the design system, vendored as a pinned
 submodule at `vendor/design-system/` (see [Design system](#design-system)).
 
-**Status:** Phase 1 (backend) in progress. The React app (Phase 2+) does not exist yet.
-See [`ROADMAP.md`](ROADMAP.md) for the phase breakdown and locked decisions.
+**Status:** Phase 0 (design system) and Phase 1 (backend) both done as of 6 Sep 2026.
+The React app (Phase 2+) does not exist yet. See [`ROADMAP.md`](ROADMAP.md) for the
+phase breakdown and locked decisions.
 
 ---
 
@@ -212,13 +213,33 @@ curl -sX POST http://localhost:8000/functions/v1/set-jmap-secret \
 
 ---
 
-## Not done yet (Phase 1 remainder)
+## Phase 1 remainder — all done, 6 Sep 2026
 
-- Run `supabase db reset` (started); fix anything it surfaces.
-- Live-test the 4 Edge Functions through Kong; `functions/_shared/jmap.ts` dedupe;
-  `generate-pdf` fonts/wrap/pagination.
-- Bump the far-behind image set (`supabase/postgres:15.1.1.78`, `gotrue:v2.151.0`,
-  `postgrest:v12.0.1`, `realtime:v2.30.23`, `studio:20240729-*`) to a current
-  self-host bundle; decide Postgres 15 → 17.
-- Realtime `invalid_schema_name` crash — optional (online-first CRM doesn't need it).
-- Confirm the `supabase/edge-runtime` image tag + `main` dispatcher API line up.
+Every item this section used to track is closed; full detail (what broke, what fixed
+it, what was verified live) is in [`ROADMAP.md`](ROADMAP.md)'s Phase 1 section, not
+repeated here.
+
+- ✅ `supabase db reset` — clean on Postgres 17 (below), both dev accounts log in, RLS
+  scopes them correctly.
+- ✅ Live-tested all 4 Edge Functions through Kong (`set-jmap-secret`'s Vault
+  round-trip, `sync-contacts`/`sync-calendar` failing only at the real-Stalwart
+  boundary, `generate-pdf` producing a valid, readable-back PDF). `jmap.ts` dedupe was
+  already done. `generate-pdf` font embedding — the one item still open before — is
+  now also done: real design-system brand fonts (a build-time step, not a runtime
+  embed; see the function's own header comment for why).
+- ✅ Image set bumped to **Postgres 17** (`supabase/postgres:17.6.1.168`) and the
+  latest stable tag of every other image (`gotrue`, `postgrest`, `realtime`,
+  `storage-api`, `postgres-meta`, `edge-runtime`, `studio`, `kong`) — kept Kong rather
+  than following upstream's move to Envoy + Supavisor + imgproxy, a config-format
+  rewrite unrelated to the actual ask. Four real permission/config bugs the version
+  jump surfaced are documented in ROADMAP, including one — `GOTRUE_JWT_AUD` — that
+  silently broke every login and would hit the *old* Flutter repo's still-running
+  stack too if it's ever bumped past gotrue v2.151.
+- ✅ Realtime `invalid_schema_name` — fixed for free by the 5 Sep bring-up fix (same
+  root cause), confirmed still fixed after today's bump.
+- ✅ `supabase/edge-runtime` tag (now `v1.76.2`) and the `main` dispatcher confirmed
+  aligned — that's exactly what the live Edge Function tests above exercised.
+
+The one item genuinely left is secrets hygiene's Stalwart-key rotation, which needs
+the Stalwart admin console — a manual, owner-only action in the *old* repo, not
+something to automate here.

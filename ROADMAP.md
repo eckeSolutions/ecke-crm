@@ -90,21 +90,68 @@ start — there is no compatibility shim.
       called `vault.update_secret` with a param named `id` — the installed
       `supabase_vault` 0.3.1's actual signature uses `secret_id`, so PostgREST silently
       404'd on unnamed-parameter mismatch instead of erroring on a type mismatch.
-- [ ] `generate-pdf`: add font embedding (Asap / Source Sans 3) — text wrapping and
-      multi-page pagination are done (word-wrapped descriptions, page breaks that
-      repeat the table header + footer). Confirm it is the **single** PDF renderer (no
-      client-side builder — the old app's drift trap).
+- [x] `generate-pdf`: add font embedding (Asap / Source Sans 3). **Done 6 Sep
+      2026.** Two real blockers, not a one-line change: (1) the design system's body
+      face (`body.woff2`) is a *variable* font defaulting to wght 200 (ExtraLight) —
+      pdf-lib/fontkit has no API to pick a different instance, so embedding it as-is
+      renders the whole invoice too thin. Fixed by pre-instantiating static wght
+      400 / 700 TTFs at build time with fontTools' `varLib.instancer`
+      (`scripts/build-fonts.py`) — Deno's edge runtime has no fonttools/harfbuzz to do
+      that at request time. (2) `supabase/edge-runtime` bundles a function's module
+      graph before running it and does not carry sibling non-module files — a plain
+      `Deno.readFile("./assets/*.ttf")` 404'd ("path not found:
+      /var/tmp/sb-compile-edge-runtime/..."), so the fonts are inlined as base64
+      string constants in a generated `.ts` module instead (part of the module graph,
+      survives bundling). Also found while verifying the render with PyMuPDF: pdf-lib
+      writes an embedded `.woff2`'s raw compressed bytes straight into the PDF's font
+      stream instead of the decompressed sfnt the format requires — Chrome/Adobe
+      tolerate it, MuPDF/FreeType don't (`unknown file format`) — so every font,
+      including the three already-static wordmark faces, is repacked to plain `.ttf`
+      by the same script. The invoice header now renders the real three-part
+      `ecke`/`.`/`Solutions` wordmark (matching `components.css .wordmark`, one
+      dedicated static face per part) instead of Helvetica standing in for it. Text
+      wrapping and multi-page pagination (word-wrapped descriptions, page breaks that
+      repeat the table header + footer) were already done. It remains the **single**
+      PDF renderer — no client-side builder.
 - [x] Dedupe `resolveJmapCredentials()` into `supabase/functions/_shared/`.
-- [ ] Bump the far-behind image set (`postgres:15.1.1.78`, `gotrue`, `postgrest`,
-      `realtime`, `studio`); decide Postgres 15 → 17. Contained sub-task, DB backup
-      first — don't let it block the function work. **Checked 5 Sep 2026:** upstream
-      `supabase/supabase`'s own compose has moved past a same-shape bump — Kong is
-      replaced by `envoyproxy/envoy` (Kong kept only as a network alias for
-      compatibility) and a `supavisor` pooler was added, Postgres now defaults to 17.x,
-      and PostgREST/Realtime/Storage have each jumped 2+ major versions. Needs a
-      deliberate pass against a running stack (`docker compose up` + `db reset` to
-      verify), not a blind tag swap — do this with Docker available, not blocked-and-
-      guessed.
+- [x] Bump the far-behind image set (`postgres:15.1.1.78`, `gotrue`, `postgrest`,
+      `realtime`, `studio`); decide Postgres 15 → 17. **Done 6 Sep 2026 — Postgres
+      17** (`supabase/postgres:17.6.1.168`), latest stable tag on every other image
+      (`gotrue:v2.196.0`, `postgrest:v16.2`, `realtime:v2.134.6`,
+      `storage-api:v1.73.0`, `postgres-meta:v0.99.0`, `edge-runtime:v1.76.2`,
+      `studio:2026.09.04-sha-5a67366`). Verified live against both the Supabase CLI's
+      local stack and the self-hosted `infrastructure/supabase` stack — schema +
+      seeds load clean on Postgres 17, both dev accounts log in, RLS scopes them
+      correctly (admin sees all 60 invoices, employee 26), all 4 Edge Functions and
+      all 4 RPCs return through Kong. **Kept Kong** (bumped 3.4 → 3.9.3) rather than
+      following upstream's move to Envoy + a Supavisor pooler + imgproxy — that's a
+      config-format rewrite (Envoy's listener/route/cluster model, not Kong's
+      declarative YAML), not a same-shape tag bump, and nothing in this repo's
+      `kong.yml` uses a plugin Kong 3.9 deprecated. Revisit only if Kong itself is
+      ever the problem. Four real bugs surfaced by the version jump, not just a tag
+      edit:
+      - `storage`'s `DATABASE_URL` connected as the plain `postgres` role, which
+        pg17's stricter default grants no longer give USAGE on the `storage` schema
+        (`permission denied for schema storage`) — reconnected as
+        `supabase_storage_admin`, the same pattern `auth` already used.
+      - `realtime`'s `DB_USER` was also plain `postgres`, same class of failure
+        against the `_realtime` schema — changed to `supabase_admin` (confirmed
+        against upstream's own compose; `supabase_admin`, not `postgres`, is the
+        actual superuser role on this image).
+      - `realtime` v2.134.6 hard-requires `METRICS_JWT_SECRET` at boot (new metrics
+        endpoint auth) — without it the release config fails to evaluate at all,
+        before ever touching the DB. Added, reusing `JWT_SECRET`.
+      - `GOTRUE_JWT_DEFAULT_GROUP_NAME` (which this compose set) is deprecated as of
+        gotrue v2.196.0 and silently no longer applied — its replacement,
+        `GOTRUE_JWT_AUD`, was never set, so every password-grant login ran
+        `... WHERE aud = ''` against users whose `aud = 'authenticated'`, matched
+        zero rows, and 400'd "Invalid login credentials" — indistinguishable from a
+        wrong password. Found by setting `GOTRUE_LOG_LEVEL=debug` and reading the
+        actual SQL GoTrue issued. Fixed by adding `GOTRUE_JWT_AUD: authenticated`
+        explicitly; this is very likely a live bug in the *old* Flutter repo's
+        still-running self-hosted stack too if it's ever bumped past gotrue v2.151.
+      `supabase/config.toml`'s `major_version` bumped 15 → 17 to match, re-verified
+      `db reset` clean.
 - [ ] Secrets hygiene: obvious placeholders in every tracked `*.example`; rotate the
       real-looking Stalwart key in the git-ignored `supabase/functions/.env`. **Checked
       5 Sep 2026:** every tracked `*.example` in this repo is already a placeholder —
@@ -119,8 +166,10 @@ start — there is no compatibility shim.
 
 **Done when:** a clean stack comes up, all 4 functions return correctly through Kong,
 and `generate-pdf` produces a wrapped, paginated, §19-compliant A4 PDF into the
-`invoice-pdfs` bucket. **Met 5 Sep 2026** (font embedding is the one still-open item,
-tracked above) — see the checked items for what was verified and fixed to get there.
+`invoice-pdfs` bucket, with the design system's own brand fonts. **Fully met 6 Sep
+2026** — see the checked items for what was verified and fixed to get there. The one
+remaining Phase 1 line is secrets hygiene's manual, owner-only Stalwart-key rotation
+in the *old* repo.
 
 ---
 
@@ -199,5 +248,24 @@ invoice PDF from a real time-tracking → invoice flow.
   proves too heavy.
 - **`@stencil/react-output-target` major** — confirm its React 18/19 prop-vs-attribute
   and event handling before Phase 0 freezes the wrapper API.
-- **Postgres 15 → 17** — decide during the Phase 1 image bump.
 - Keep the old repo's `okf/` knowledge bundle? (Phase 2 `CLAUDE.md` port.)
+- **UUIDv7 primary keys** — raised 6 Sep 2026, not decided. Every table currently
+  uses `uuid_generate_v4()` (see `docs/DATABASE_SCHEMA.md` §2 for the full column
+  reference). UUIDv7 embeds a millisecond timestamp in its high bits, so IDs sort
+  roughly by creation time — the appeal for this app specifically is a future
+  offline-write path: a client generating its own PK offline (a time-tracking
+  stopwatch stopped on a plane, say) gets an ID that's already correctly ordered
+  against server-generated rows once synced, without a separate `created_at`
+  tiebreak or a server round-trip to get an ID before the row can be shown locally.
+  Weighed against adopting it now: Postgres 17 (just bumped, above) has no native
+  `uuidv7()` — needs `pg_uuidv7`/`pgcrypto`-adjacent extension or an app-side
+  generator; `sortable-but-not-sequential` still leaks a rough creation-time signal
+  clients can observe (irrelevant for a two-person internal tool, worth naming
+  anyway); and this repo has **no offline-write path today** — [ROADMAP.md](#decisions-locked)'s
+  own "Offline" row is explicitly online-first, no offline writes, so switching now
+  buys nothing yet and only pays the migration cost once, later, when Phase 4+ or a
+  post-launch phase actually adds one. Recommendation if that day comes: it's a
+  one-column-type schema change (`uuid` stays `uuid`, only the generator changes),
+  cheap under the current "no incremental migrations, `db reset` from scratch"
+  rule — revisit `public.uuid_generate_v4()`'s callers in
+  `20260101000000_initial_schema.sql` then, not before.

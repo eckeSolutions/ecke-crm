@@ -19,9 +19,9 @@ max_rows = 1000
 [db]
 port = 54322
 shadow_port = 54320
-# Matches infrastructure/supabase/docker-compose.yml -> supabase/postgres:15.x.
-# If the self-hosted image is bumped to 17, bump this too and re-test db reset.
-major_version = 15
+# Matches infrastructure/supabase/docker-compose.yml -> supabase/postgres:17.x.
+# Bumped 15 -> 17 together (6 Sep 2026); re-tested `db reset` clean on both.
+major_version = 17
 
 [db.pooler]
 enabled = false
