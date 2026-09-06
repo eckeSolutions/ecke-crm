@@ -42,7 +42,7 @@ migration wins any disagreement, so update the doc in the same commit as the sch
 
 ## Design system
 
-`vendor/design-system/` is a git submodule pinned to a tag (currently `v0.3.0`), never
+`vendor/design-system/` is a git submodule pinned to a tag (currently `v0.3.1`), never
 a floating branch. Bump it deliberately:
 
 ```bash

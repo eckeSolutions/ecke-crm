@@ -21,7 +21,7 @@ phase breakdown and locked decisions.
 
 `vendor/design-system/` is a git submodule pinned to a tagged release of
 [eckeSolutions/ecke.Solutions-Design-System](https://github.com/eckeSolutions/ecke.Solutions-Design-System)
-— currently **`v0.3.0`**. This replaces the old hand-copied brand CSS values; the pin
+— currently **`v0.3.1`**. This replaces the old hand-copied brand CSS values; the pin
 is bumped deliberately, never floating.
 
 ```bash

@@ -4,9 +4,9 @@ Living punch-list for the ecke-crm rebuild (Stencil design system + React PWA, o
 old Flutter/Dart app). The full architecture rationale is the plan referenced in
 `README.md`; this file is the sequenced "what's next", updated in place as items close.
 
-**Status (6 Sep 2026):** Phase 0 (design system) **done** — `v0.3.0` tagged and the
-submodule pin bumped. Phase 1 (backend) in progress. The React app (Phase 2+) does not
-exist yet.
+**Status (6 Sep 2026):** Phase 0 (design system) and Phase 1 (backend) both **done**
+— design system at `v0.3.1`, self-hosted stack on Postgres 17. Phase 2 (app shell) in
+progress.
 
 ---
 
@@ -16,7 +16,7 @@ exist yet.
 |---|---|
 | Framework | **React** (Vite + TypeScript). PWA via `vite-plugin-pwa` (Workbox). |
 | App shell | **React Router** (v6/v7) + **View Transitions API** or **Framer Motion** + headless overlays **from `ecke-ui`**. No `@ionic/react`, no Ionic platform layer — see the design system's `docs/ionic-framework-evaluation.md` Decision C (owner-confirmed 30 Aug 2026). `@ionic/core` `createGesture` may be imported standalone if a real gesture need appears. |
-| Design system | Consumed as a **git submodule** at `vendor/design-system/`, pinned to a tag, built in place (`npm ci && npm run build` inside `vendor/design-system/stencil/`). Pinned to `v0.3.0` (bumped 6 Sep 2026). A private npm package is the documented fallback, not the plan. |
+| Design system | Consumed as a **git submodule** at `vendor/design-system/`, pinned to a tag, built in place (`npm ci && npm run build` inside `vendor/design-system/stencil/`). Pinned to `v0.3.1` (bumped 6 Sep 2026 — v0.3.0 then a same-day v0.3.1 for two nav icons Phase 2 needed). A private npm package is the documented fallback, not the plan. |
 | Backend | Supabase (self-hosted, Hetzner + Coolify), reused essentially unchanged from the retired Flutter repo. Single-tenant: `admin` + `employee`, per-user RLS, no `organization_id`. |
 | Data | `@tanstack/react-query` v5 · `@supabase/supabase-js` v2 · `react-hook-form` + `zod` · generated DB types. |
 | Offline | Installable + **online-first**. Service-worker precache of shell + DS assets; Supabase GETs `NetworkFirst`. No sync engine, no offline writes. Running stopwatch persisted to `localStorage`. |
@@ -44,8 +44,10 @@ because Phase 2 pins the result.
       browser project, wired into CI.
 - [x] `v0.3.0` cut and pushed as an annotated tag.
 
-**Done (5 Sep 2026, pin bumped here 6 Sep 2026).** `vendor/design-system` is checked out
-at `v0.3.0`; see that repo's `CHANGELOG.md` for the full breaking-change list. Phase 2
+**Done (5 Sep 2026, pin bumped here 6 Sep 2026, then to `v0.3.1` the same day —**
+**two nav icons, `settings` + `wallet`, that Phase 2's app shell needed and the
+fixed 19-name icon set didn't have).** `vendor/design-system` is checked out at
+`v0.3.1`; see that repo's `CHANGELOG.md` for the full breaking-change list. Phase 2
 must consume the renamed props (`emphasis`/`tone`/`surface`, `--*-tint-info`) from the
 start — there is no compatibility shim.
 
@@ -178,7 +180,7 @@ in the *old* repo.
 Depends on Phase 0's `v0.3.0` tag and a running Phase 1 backend.
 
 - [ ] Scaffold Vite + React 18 + TypeScript (`pnpm`).
-- [x] Add the DS submodule at `vendor/design-system/`, pin `v0.3.0`.
+- [x] Add the DS submodule at `vendor/design-system/`, pin `v0.3.1`.
 - [ ] A `postinstall` (or `make setup`) builds its `stencil/` (incl. `stencil/react/`).
       Vite alias `@ds → vendor/design-system`.
 - [ ] `import '../vendor/design-system/styles.css'` in `main.tsx` (tokens +
