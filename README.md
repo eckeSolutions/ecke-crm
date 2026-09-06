@@ -11,9 +11,10 @@ Source repos it draws from: `../ecke.Solutions CRM_old` (retired Flutter app —
 backend was lifted from it, see below), and the design system, vendored as a pinned
 submodule at `vendor/design-system/` (see [Design system](#design-system)).
 
-**Status:** Phase 0 (design system) and Phase 1 (backend) both done as of 6 Sep 2026.
-The React app (Phase 2+) does not exist yet. See [`ROADMAP.md`](ROADMAP.md) for the
-phase breakdown and locked decisions.
+**Status:** Phases 0-2 done as of 6 Sep 2026 — design system, backend, and the React
+app shell (routing, auth, nav, PWA scaffold; every screen still a placeholder). Phase
+3 (the actual feature port) is next. See [`ROADMAP.md`](ROADMAP.md) for the phase
+breakdown and locked decisions.
 
 ---
 
@@ -148,6 +149,63 @@ Still TODO in Phase 1: bring the stack up, live-test each function with a real J
 (especially JMAP against Stalwart), and add font embedding + text wrap + pagination to
 `generate-pdf`. Dedupe the copy-pasted `resolveJmapCredentials()` in
 `sync-contacts` / `sync-calendar` into `functions/_shared/`.
+
+---
+
+## App
+
+React 19 + TypeScript, built with Vite. Feature-first under `src/` — each feature owns
+its own `routes.tsx`, spread into `App.tsx`'s router; nothing lives outside `src/`
+until Phase 3 needs it.
+
+```
+src/
+  main.tsx        # imports @ds/styles.css + @ds/stencil/src/global/global.css, mounts
+                  # BrowserRouter > QueryClientProvider > AuthProvider > App
+  App.tsx         # <Routes> — spreads every feature's routes.tsx, never defines one itself
+  lib/            # supabase.ts, queryClient.ts, formatters.ts (DE locale), money.ts (§19),
+                  # database.types.ts (generated — see "Regenerating types" below)
+  auth/           # AuthProvider (session + profile + advisory isAdmin), RequireAuth,
+                  # RequireAdmin, LoginPage
+  shell/          # AppShell (ecke-sidebar-nav <-> ecke-bottom-nav @ 768px), nav-items,
+                  # useShellNavClick (SPA-intercepts the nav components' own <a> clicks),
+                  # OfflineBanner
+  features/       # dashboard, kunden, zeiterfassung, rechnungen, finanzen, einstellungen —
+                  # placeholder screens today (Phase 3 replaces them one at a time)
+```
+
+### Run it
+
+```bash
+npm install                          # also builds vendor/design-system/stencil via postinstall
+cp .env.example .env.local           # defaults already point at the Supabase CLI's local stack
+npx --yes supabase@latest start      # if it isn't already running
+npm run dev                          # http://localhost:5173
+```
+
+Dev-account logins (seeded by `supabase db reset`, see "Dev data" above):
+`admin@ecke.test` / `employee@ecke.test`, both `devpassword`.
+
+```bash
+npm run typecheck   # tsc -b --noEmit
+npm run lint        # ESLint, scoped to src/ — see CLAUDE.md's App shell conventions
+                     # for why supabase/functions/ and vendor/ are excluded
+npm test            # Vitest, scoped to src/**/*.test.{ts,tsx}
+npm run build       # tsc -b && vite build -> dist/
+npm run gen:types   # regenerate src/lib/database.types.ts after any schema change
+```
+
+Two real bugs worth knowing about if something here seems to work halfway and then
+break in a confusing way — both covered in more depth in `CLAUDE.md`'s "App shell
+conventions" and ROADMAP.md's Phase 2 entry:
+
+- **A duplicate React copy.** `vendor/design-system/stencil/react` has its own
+  `node_modules`; without `vite.config.ts`'s `resolve.dedupe`, its React differs from
+  this project's own and every `ecke-*` component's hooks throw "Invalid hook call".
+- **Nav clicks need a real `addEventListener`, not a JSX `onClick`.** The sidebar/
+  bottom-nav components render plain `<a href>` inside their own shadow DOM; a
+  React-delegated synthetic click handler cannot reliably `preventDefault()` the
+  browser's default navigation for it. See `src/shell/useShellNavClick.ts`.
 
 ---
 

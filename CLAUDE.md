@@ -55,6 +55,38 @@ Every value in the app is a `var(--token)` from that submodule. Dark-only — no
 mode, no `prefers-color-scheme` branch. React components come from
 `vendor/design-system/stencil/react/`, not hand-registered custom elements.
 
+## App shell conventions (Phase 2)
+
+- **Path aliases:** `@/*` → `src/*`, `@ds/*` → `vendor/design-system/*`. Defined in
+  both `vite.config.ts` (`resolve.alias`) and `tsconfig.app.json` (`paths`) — keep
+  them in sync, or the editor and the bundler disagree about what resolves.
+- **`resolve.dedupe: ["react", "react-dom"]` in `vite.config.ts` is load-bearing, not
+  cosmetic.** `vendor/design-system/stencil/react` has its own, separate
+  `node_modules` — without dedupe, its React copy differs from this project's and
+  every `ecke-*` wrapper's hooks break ("Invalid hook call"). Don't remove it while
+  investigating a hook bug; that's almost certainly the cause.
+- **A nav/link click inside an `ecke-*` component needs a real
+  `addEventListener` via a ref, never a JSX `onClick` on the wrapping element.**
+  `ecke-sidebar-nav` / `ecke-bottom-nav` render plain `<a href>` in their own shadow
+  DOM; a click's `composedPath()` still finds it, but React's root-delegated
+  synthetic dispatch does not reliably let `preventDefault()` stop the browser's own
+  default navigation for a composed/shadow-crossing event (confirmed live — see
+  ROADMAP.md's Phase 2 entry). `src/shell/useShellNavClick.ts` is the working
+  pattern; reuse it rather than re-deriving this per feature.
+- **Form controls (`ecke-input`, `ecke-dropdown`, `ecke-textarea`, …) are
+  controlled custom elements, not native inputs** — wire them through
+  `react-hook-form`'s `Controller`, reading the value from the component's own
+  `onEckeInput`/`onEckeChange` event `detail` (a string), not `event.target.value`.
+  `src/auth/LoginPage.tsx` is the reference implementation.
+- **Each feature owns its own `routes.tsx`**, exporting a `const xRoutes = <>...
+  </>;` — a JSX value (not a component function) containing `<Route>` elements —
+  spread directly into `App.tsx`'s top-level `<Routes>`. A feature never edits
+  `App.tsx` to add its own routes, and `App.tsx` never contains a route path/element
+  pair directly.
+- **`useAuth().isAdmin` is advisory only** — gates which nav items/buttons render,
+  never a real permission check. RLS is the only real gate; a client-side admin
+  check bypassed by devtools must still fail server-side.
+
 ## GoBD, always
 
 An invoice that has left `draft` is immutable, and the database enforces it. Never

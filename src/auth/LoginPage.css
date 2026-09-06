@@ -1,0 +1,31 @@
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6);
+  background: var(--gradient-hero);
+}
+
+.login-page__card {
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-6);
+}
+
+.login-page__card form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.login-page__error {
+  /* matches ecke-field's own .field__error color, for the same "invalid
+     credentials" class of message outside any one field */
+  color: var(--status-danger);
+  font-size: var(--text-sm);
+  margin: 0;
+}

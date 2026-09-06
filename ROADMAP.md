@@ -4,9 +4,10 @@ Living punch-list for the ecke-crm rebuild (Stencil design system + React PWA, o
 old Flutter/Dart app). The full architecture rationale is the plan referenced in
 `README.md`; this file is the sequenced "what's next", updated in place as items close.
 
-**Status (6 Sep 2026):** Phase 0 (design system) and Phase 1 (backend) both **done**
-— design system at `v0.3.1`, self-hosted stack on Postgres 17. Phase 2 (app shell) in
-progress.
+**Status (6 Sep 2026):** Phases 0-2 all **done** — design system at `v0.3.1`,
+self-hosted stack on Postgres 17, the React app shell scaffolded and verified in a
+real browser (login, routing, nav, RLS-scoped nav visibility, the 768px swap). Phase 3
+(feature port) is next.
 
 ---
 
@@ -14,8 +15,8 @@ progress.
 
 | Area | Decision |
 |---|---|
-| Framework | **React** (Vite + TypeScript). PWA via `vite-plugin-pwa` (Workbox). |
-| App shell | **React Router** (v6/v7) + **View Transitions API** or **Framer Motion** + headless overlays **from `ecke-ui`**. No `@ionic/react`, no Ionic platform layer — see the design system's `docs/ionic-framework-evaluation.md` Decision C (owner-confirmed 30 Aug 2026). `@ionic/core` `createGesture` may be imported standalone if a real gesture need appears. |
+| Framework | **React 19** (Vite + TypeScript, `npm` — not `pnpm`, see Phase 2's first item). PWA via `vite-plugin-pwa` (Workbox). |
+| App shell | **React Router v7** + **View Transitions API** (`navigate(href, { viewTransition: true })`) + headless overlays **from `ecke-ui`**. No `@ionic/react`, no Ionic platform layer — see the design system's `docs/ionic-framework-evaluation.md` Decision C (owner-confirmed 30 Aug 2026). `@ionic/core` `createGesture` may be imported standalone if a real gesture need appears. |
 | Design system | Consumed as a **git submodule** at `vendor/design-system/`, pinned to a tag, built in place (`npm ci && npm run build` inside `vendor/design-system/stencil/`). Pinned to `v0.3.1` (bumped 6 Sep 2026 — v0.3.0 then a same-day v0.3.1 for two nav icons Phase 2 needed). A private npm package is the documented fallback, not the plan. |
 | Backend | Supabase (self-hosted, Hetzner + Coolify), reused essentially unchanged from the retired Flutter repo. Single-tenant: `admin` + `employee`, per-user RLS, no `organization_id`. |
 | Data | `@tanstack/react-query` v5 · `@supabase/supabase-js` v2 · `react-hook-form` + `zod` · generated DB types. |
@@ -175,32 +176,117 @@ in the *old* repo.
 
 ---
 
-## Phase 2 — App shell  *(this repo — greenfield)*
+## Phase 2 — App shell  *(this repo — greenfield)*  ✅
 
-Depends on Phase 0's `v0.3.0` tag and a running Phase 1 backend.
+Depends on Phase 0's `v0.3.1` tag and a running Phase 1 backend. **Done 6 Sep 2026** —
+every item below verified against a real browser (Puppeteer against the dev server),
+not just "it compiles": login → dashboard → nav → sign-out, an employee vs. admin
+account seeing different nav, a direct `/einstellungen` URL hit bouncing a non-admin,
+a hard reload on a 2-level-deep route (`/kunden/:id/bearbeiten`) restoring correctly,
+and the 768px sidebar↔bottom-nav swap, all screenshotted and read, not just asserted.
 
-- [ ] Scaffold Vite + React 18 + TypeScript (`pnpm`).
+- [x] Scaffold Vite + React + TypeScript (`npm`, not `pnpm` — the plan's original
+      choice; deviated because `pnpm` needed a manual global install with no lockfile
+      benefit over `npm` once installed, and everything below was verified end-to-end
+      under `npm`, including a subtle module-resolution bug switching package
+      managers again could plausibly reintroduce, see the `resolve.dedupe` item
+      below). **React 19**, not React 18 as the plan originally named — the design
+      system's own `stencil/react` peer range already covers `^18 || ^19`, and 19 is
+      current `create-vite`'s default now.
 - [x] Add the DS submodule at `vendor/design-system/`, pin `v0.3.1`.
-- [ ] A `postinstall` (or `make setup`) builds its `stencil/` (incl. `stencil/react/`).
-      Vite alias `@ds → vendor/design-system`.
-- [ ] `import '../vendor/design-system/styles.css'` in `main.tsx` (tokens +
-      `color-scheme: dark` + skeleton).
-- [ ] React Router with every route from the routing table → placeholder screens;
-      `<RequireAuth>`; `/einstellungen` admin-only.
-- [ ] `AuthProvider` (session + profile + advisory `isAdmin`) + login screen.
-- [ ] Port `appShellStage()` → `src/shell/AppShell.tsx` — `ecke-sidebar-nav` ↔
-      `ecke-bottom-nav` swap at 768px (the shell owns the breakpoint).
-- [ ] Route transitions via the View Transitions API (or Framer Motion).
-- [ ] `vite-plugin-pwa` + `manifest.webmanifest` (`theme_color` / `background_color` =
-      `--bg-page`, `display: standalone`); offline banner on `!navigator.onLine`.
-- [ ] CI (`ci.yml`): `checkout` with `submodules: true` → build submodule `stencil/` →
-      typecheck + ESLint + `vitest` + `vite build`.
-- [ ] Slimmed `CLAUDE.md` / `AGENT.md` ported into this repo (keep the RLS / `is_admin()`
-      / §19 / no-edit-after-sent / timestamped-migrations / secrets rules; drop the
-      Flutter mandates).
+- [x] `postinstall` runs `npm --prefix vendor/design-system/stencil ci && ... run
+      build:all` (package.json's `setup` script). Vite alias `@ds → vendor/design-system`
+      (`vite.config.ts`, mirrored in `tsconfig.app.json`'s `paths` for editor/tsc
+      resolution).
+      **Real bug found and fixed:** `vendor/design-system/stencil/react` has its own,
+      separate `node_modules` (its own `npm ci`, no workspace link to this project) —
+      react/react-dom there resolve to a *different copy* of the same version than
+      this project's, which breaks every hook the wrapper components call ("Invalid
+      hook call" / "Cannot read properties of null (reading 'useRef')", confirmed
+      live). Fixed with Vite's `resolve.dedupe: ["react", "react-dom"]`.
+- [x] `main.tsx` imports `@ds/styles.css` (tokens + `components.css`) **and**
+      `@ds/stencil/src/global/global.css` (`color-scheme: dark` + the
+      `:not(:defined)` skeleton) — `styles.css` alone does **not** include the
+      latter (it only `@import`s `tokens/*.css` + `components.css`); tracked as a
+      design-system gap worth folding into `styles.css` itself, not duplicated by
+      hand here (its skeleton tag list would then drift from the component list).
+      PWA icons: the design system's own `assets/favicon/*` set (a real brand mark,
+      the "e." dot logo) — the old Flutter app's `web/icons/*` were never
+      customized past the generic Flutter logo, so there was nothing to "port" per
+      the plan's original wording; used the DS's set directly instead.
+- [x] React Router with every route from the routing table → `PlaceholderScreen`;
+      `<RequireAuth>` (redirects to `/login`, stashes the attempted path);
+      `<RequireAdmin>` on `/einstellungen` (redirects to `/`) — verified both the nav
+      item hides for a non-admin **and** a direct URL hit is still blocked.
+- [x] `AuthProvider` (session + profile via TanStack Query, keyed on `session.user.id`
+      + advisory `isAdmin`) + `LoginPage` (`react-hook-form` + `zod`, `ecke-input` /
+      `ecke-field` / `ecke-button` via a `Controller`-per-field pattern other forms
+      can copy).
+- [x] Ported `appShellStage()` → `src/shell/AppShell.tsx` + `AppShell.css` — same
+      768px breakpoint, same structure, `ecke-sidebar-nav` ↔ `ecke-bottom-nav`.
+      **Real bug found and fixed:** neither nav component's own `<a href>` is a
+      React Router `<Link>` (they're plain anchors inside each component's shadow
+      DOM, by design — see their source). A JSX `onClick` on the wrapping element
+      does **not** reliably intercept them: React's root-delegated listener replay
+      calls `preventDefault()` on the native event (confirmed `defaultPrevented ===
+      true` in both places) yet the browser still followed the link anyway — same
+      DOM, same `composedPath()`, only the *attachment method* differed from a
+      working control test. Fixed with a real `addEventListener` via a ref
+      (`useShellNavClick`) instead of a JSX prop; that reliably intercepts, checks
+      modifier keys / non-left-clicks / `target="_blank"` / external hrefs same as a
+      plain `<a>`, and calls `navigate(href, { viewTransition: true })`.
+      Two of the six nav icons (Finanzen, Einstellungen) didn't exist in the design
+      system's fixed 19-icon set — `settings` + `wallet` added there, released as
+      `v0.3.1` (already reflected in the pin above; see that repo's own
+      `CHANGELOG.md`). The sidebar's own footer renders a logout glyph but wires no
+      event (decorative only, confirmed in its source) — real sign-out is a
+      separate, always-visible icon button in `AppShell`, not a hack reaching into
+      that shadow-internal element.
+- [x] Route transitions via the View Transitions API — `navigate(href, {
+      viewTransition: true })` in `useShellNavClick` (React Router's own
+      integration, which `flushSync`s internally; hand-wrapping
+      `document.startViewTransition()` around a bare `navigate()` call does not
+      work correctly since React's state update isn't synchronous). No-ops safely
+      without browser support.
+- [x] `vite-plugin-pwa`: manifest (`theme_color`/`background_color` = `--bg-page`
+      `#061b2b`, `display: standalone`, the DS's real icon set), Supabase REST GETs
+      `NetworkFirst`; `OfflineBanner` (`ecke-notification`, tone `warning`) shows on
+      `!navigator.onLine`, rendered once above the router so it survives a route
+      change or a bounce to `/login` — screenshotted with `navigator.onLine` forced
+      false to confirm it actually renders, not just that the hook compiles.
+      **Deployment note for Phase 4:** a hard refresh on a deep route only works
+      today because Vite's dev server has SPA fallback built in — the static file
+      server Coolify serves `dist/` from needs the same (serve `index.html` for any
+      unmatched path) or production refreshes will 404 where dev didn't.
+- [x] `ci.yml`: `checkout` with `submodules: true` → `npm ci` (runs the
+      design-system build via `postinstall`) → typecheck → ESLint → `vitest` →
+      `vite build`.
+- [x] `eslint.config.js` scoped to `src/` (flat config, ESLint 10 + typescript-eslint
+      + react-hooks + react-refresh) — deliberately excludes `supabase/functions/**`
+      (Deno Edge Functions: different runtime/globals, their own linter) and
+      `vendor/` (the design system lints itself). Running unscoped surfaced 2
+      pre-existing issues in `supabase/functions/` now visible for a future pass
+      (`set-jmap-secret`'s unused `secretId` assignment, an `any` in
+      `sync-calendar`) — not fixed here since they're outside a Deno-aware lint
+      config's actual jurisdiction; noted for whenever this repo sets one up.
+      `eslint-plugin-react-hooks@7`'s own `"recommended-latest"` export still uses
+      the legacy eslintrc `plugins: ["react-hooks"]` shape, which ESLint 10's flat
+      config rejects outright — worked around by registering the plugin object
+      directly and spreading just its `rules`.
+- [x] `vitest.config.ts` scoped to `src/**/*.test.{ts,tsx}` — the unscoped default
+      also swept in `vendor/design-system/stencil/dist/**/*.cmp.test.js`, that
+      submodule's own compiled browser-mode test output, which isn't meant for this
+      project's jsdom environment (84 of them timed out before this was scoped).
+      18 tests today: `formatEuro`/`formatDecimalDe`/`formatDateDe`/
+      `formatDateShortDe`/`formatMonthAbbrevDe`, `sumLineTotals`/`roundMoney`, and
+      the ledger `totalIncome`/`totalExpense`/`balance` trio.
+- [x] `CLAUDE.md` (already existed from Phase 1, extended here) keeps the
+      RLS/`is_admin()`/§19/no-edit-after-sent/one-migration-file/secrets rules and
+      gains the app-shell conventions below — no separate `AGENT.md`, no Flutter
+      mandates to drop (there were none in this repo to begin with).
 
 **Done when:** log in, land on `/`, every nav target is a real URL, refresh on a deep
-route restores it, and the 768px nav swap works.
+route restores it, and the 768px nav swap works. **Met.**
 
 ---
 

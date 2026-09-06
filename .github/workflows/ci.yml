@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # The design system lives at vendor/design-system/ as a real git
+          # submodule (pinned to a tag, never floating) — without this the
+          # checkout is an empty directory and every step below fails.
+          submodules: true
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      # Builds vendor/design-system/stencil (incl. stencil/react/) via this
+      # repo's own postinstall — see package.json's "setup" script and
+      # README.md's "Design system" section.
+      - name: Install dependencies (runs the design-system build via postinstall)
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build

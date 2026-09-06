@@ -1,7 +1,9 @@
-# --- Node / app (added in Phase 2) ---
+# --- Node / app (Phase 2) ---
 node_modules/
 dist/
-build/
+dev-dist/
+*.tsbuildinfo
+coverage/
 *.log
 .DS_Store
 Thumbs.db

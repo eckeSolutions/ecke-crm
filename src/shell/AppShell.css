@@ -1,0 +1,51 @@
+/* Ported from vendor/design-system/stencil/src/stories-utils/stage.ts
+   appShellStage() — same breakpoint (768px, matching ecke-navbar /
+   ecke-page-header), same structure. Keep the two in sync if that
+   prototype's CSS changes. */
+
+.app-shell {
+  display: flex;
+  height: 100vh;
+}
+
+.app-shell__main {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  background: var(--bg-page);
+  padding: var(--space-6);
+  position: relative;
+}
+
+.app-shell__signout {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-6);
+  z-index: 1;
+}
+
+.app-shell__bottom {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .app-shell {
+    flex-direction: column;
+  }
+  .app-shell__sidebar {
+    display: none;
+  }
+  .app-shell__main {
+    order: 1;
+    padding: var(--space-4);
+    /* leaves room so page content never sits under the fixed bottom bar */
+    padding-bottom: calc(var(--space-4) + 64px);
+  }
+  .app-shell__signout {
+    right: var(--space-4);
+  }
+  .app-shell__bottom {
+    display: block;
+    order: 2;
+  }
+}
