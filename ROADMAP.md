@@ -4,8 +4,9 @@ Living punch-list for the ecke-crm rebuild (Stencil design system + React PWA, o
 old Flutter/Dart app). The full architecture rationale is the plan referenced in
 `README.md`; this file is the sequenced "what's next", updated in place as items close.
 
-**Status (31 Aug 2026):** Phase 1 (backend) in progress. Phase 0 (design system) not
-started. The React app (Phase 2+) does not exist yet.
+**Status (6 Sep 2026):** Phase 0 (design system) **done** — `v0.3.0` tagged and the
+submodule pin bumped. Phase 1 (backend) in progress. The React app (Phase 2+) does not
+exist yet.
 
 ---
 
@@ -15,35 +16,38 @@ started. The React app (Phase 2+) does not exist yet.
 |---|---|
 | Framework | **React** (Vite + TypeScript). PWA via `vite-plugin-pwa` (Workbox). |
 | App shell | **React Router** (v6/v7) + **View Transitions API** or **Framer Motion** + headless overlays **from `ecke-ui`**. No `@ionic/react`, no Ionic platform layer — see the design system's `docs/ionic-framework-evaluation.md` Decision C (owner-confirmed 30 Aug 2026). `@ionic/core` `createGesture` may be imported standalone if a real gesture need appears. |
-| Design system | Consumed as a **git submodule** at `vendor/design-system/`, pinned to a tag, built in place (`npm ci && npm run build` inside `vendor/design-system/stencil/`). Currently `v0.2.0`; Phase 2 pins `v0.3.0`. A private npm package is the documented fallback, not the plan. |
+| Design system | Consumed as a **git submodule** at `vendor/design-system/`, pinned to a tag, built in place (`npm ci && npm run build` inside `vendor/design-system/stencil/`). Pinned to `v0.3.0` (bumped 6 Sep 2026). A private npm package is the documented fallback, not the plan. |
 | Backend | Supabase (self-hosted, Hetzner + Coolify), reused essentially unchanged from the retired Flutter repo. Single-tenant: `admin` + `employee`, per-user RLS, no `organization_id`. |
 | Data | `@tanstack/react-query` v5 · `@supabase/supabase-js` v2 · `react-hook-form` + `zod` · generated DB types. |
 | Offline | Installable + **online-first**. Service-worker precache of shell + DS assets; Supabase GETs `NetworkFirst`. No sync engine, no offline writes. Running stopwatch persisted to `localStorage`. |
+| Schema changes | **No incremental migrations before production.** One migration file, edited in place; `supabase db reset` drops the DB, re-applies it and re-seeds `supabase/seed/*.sql` (dev accounts + ~40 clients / 60 invoices). Owner-confirmed 6 Sep 2026. Void the day real invoices exist. |
 | GoBD / §19 | Every invoice shows the §19 UStG notice. Never build a flow that edits a `sent`/`paid` invoice — corrections are `cancelled` + a new draft. Invoice numbers come only from the server (RPC is preview-only). |
 
 ---
 
-## Phase 0 — Design system ready to consume  *(in the design-system repo)*
+## Phase 0 — Design system ready to consume  *(in the design-system repo)*  ✅
 
-`ecke-crm` is blocked on the DS cutting **`v0.3.0`** with a React output target and the
+`ecke-crm` was blocked on the DS cutting **`v0.3.0`** with a React output target and the
 breaking prop renames done. Tracked in that repo's `ROADMAP.md`; summarised here
 because Phase 2 pins the result.
 
-- [ ] `@stencil/react-output-target` wired; `vendor/design-system/stencil/react` emits
+- [x] `@stencil/react-output-target` wired; `vendor/design-system/stencil/react` emits
       typed, router-agnostic wrappers.
-- [ ] Prop-vocabulary alignment (breaking): `--*-tint-brand` → `-info`;
+- [x] Prop-vocabulary alignment (breaking): `--*-tint-brand` → `-info`;
       `ecke-card` / `ecke-input` material axis `variant` → `surface`; `ecke-button`
-      `variant` untangled into orthogonal `emphasis` + `tone`.
-- [ ] New overlays the CRM needs: `ecke-toast`, `ecke-tooltip`, `ecke-combobox`;
-      `ecke-dropdown` native `<select>` → real listbox.
-- [ ] Interactive-contract tests (modal focus trap, tabs roving tabindex, table
-      + form-control event payloads, the four new components).
-- [ ] `v0.3.0` cut and pushed as an annotated tag.
+      `variant` untangled into orthogonal `emphasis` + `tone` + `surface`.
+- [x] New overlays the CRM needs: `ecke-toast`, `ecke-tooltip`, `ecke-combobox`;
+      `ecke-dropdown` native `<select>` → APG select-only combobox (`native` prop keeps
+      the old behaviour).
+- [x] Interactive-contract tests (modal focus trap, tabs roving tabindex, table
+      + form-control event payloads, the four new components) — 46 tests on the vitest
+      browser project, wired into CI.
+- [x] `v0.3.0` cut and pushed as an annotated tag.
 
-**Done when:** `git -C vendor/design-system checkout v0.3.0` gives a buildable library
-whose React wrappers render with the dark theme applied.
-
-**Runs parallel to Phase 1.**
+**Done (5 Sep 2026, pin bumped here 6 Sep 2026).** `vendor/design-system` is checked out
+at `v0.3.0`; see that repo's `CHANGELOG.md` for the full breaking-change list. Phase 2
+must consume the renamed props (`emphasis`/`tone`/`surface`, `--*-tint-info`) from the
+start — there is no compatibility shim.
 
 ---
 
@@ -125,8 +129,9 @@ tracked above) — see the checked items for what was verified and fixed to get 
 Depends on Phase 0's `v0.3.0` tag and a running Phase 1 backend.
 
 - [ ] Scaffold Vite + React 18 + TypeScript (`pnpm`).
-- [ ] Add the DS submodule at `vendor/design-system/`, pin `v0.3.0`; a `postinstall`
-      (or `make setup`) builds its `stencil/`. Vite alias `@ds → vendor/design-system`.
+- [x] Add the DS submodule at `vendor/design-system/`, pin `v0.3.0`.
+- [ ] A `postinstall` (or `make setup`) builds its `stencil/` (incl. `stencil/react/`).
+      Vite alias `@ds → vendor/design-system`.
 - [ ] `import '../vendor/design-system/styles.css'` in `main.tsx` (tokens +
       `color-scheme: dark` + skeleton).
 - [ ] React Router with every route from the routing table → placeholder screens;

@@ -6,12 +6,17 @@
 -- fields (jmap_endpoint/jmap_username/jmap_secret_id stay NULL) and does not
 -- touch auth.users/profiles.
 --
--- NOT idempotent — assumes clients/contacts/time_entries/invoices/
--- invoice_items are empty (see infrastructure/supabase/.env / README for the
--- reset steps) and invoice_number_seq is at 422. Local dev / test data only;
--- emails use the .test TLD (RFC 2606, guaranteed non-routable).
+-- Requires 00_dev_baseline.sql to have run first: it reads one admin and one
+-- employee out of public.profiles to own the invoices and time entries.
 --
--- Run: docker exec -i supabase-db psql -U postgres -d postgres -v ON_ERROR_STOP=1 < dev_dummy_data.sql
+-- NOT idempotent — assumes clients/contacts/time_entries/invoices/
+-- invoice_items are empty and invoice_number_seq is at 422. That is exactly
+-- what `supabase db reset` gives it. Local dev / test data only; emails use
+-- the .test TLD (RFC 2606, guaranteed non-routable).
+--
+-- Run: `npx supabase db reset` (loaded automatically via [db.seed] in
+-- config.toml). Against the self-hosted stack, after a fresh schema load:
+--   docker exec -i ecke-crm-db psql -U postgres -d postgres -v ON_ERROR_STOP=1 --     < supabase/seed/10_dev_dummy_data.sql
 
 BEGIN;
 

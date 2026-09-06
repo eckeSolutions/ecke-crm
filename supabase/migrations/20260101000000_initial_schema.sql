@@ -14,11 +14,14 @@
 -- admin + employee roles, per-user RLS, no organization_id. GoBD: an issued
 -- invoice is immutable and numbered gaplessly from a DB sequence.
 --
--- The auth-schema MFA phone factor is in the sibling migration
--- 20260101000100_auth_mfa_phone.sql (it alters GoTrue's own tables).
+-- The old repo's auth-schema MFA phone-factor migration was dropped, not
+-- carried over: phone MFA is native in modern GoTrue and is switched on via
+-- [auth.mfa.phone] in config.toml — no schema change.
 --
--- NOT YET VERIFIED with `supabase db reset` — Docker was unavailable when
--- this was written. That run is the acceptance gate.
+-- Verified: `supabase db reset` applies this clean (5 Sep 2026).
+--
+-- Prose walkthrough — ER diagram, RLS matrix, invoice lifecycle:
+-- docs/DATABASE_SCHEMA.md.
 
 BEGIN;
 

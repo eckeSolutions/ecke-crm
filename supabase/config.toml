@@ -26,6 +26,15 @@ major_version = 15
 [db.pooler]
 enabled = false
 
+# Pre-production convention: there is ONE schema migration, edited in place.
+# A schema change means `supabase db reset` — drop, re-apply, re-seed — never a
+# new incremental migration file. See docs/DATABASE_SCHEMA.md section 12.
+# These seeds run in filename order after the migration, so 00_ (dev accounts
+# + company profile) lands before 10_ (the ~40-client dataset).
+[db.seed]
+enabled = true
+sql_paths = ["./seed/*.sql"]
+
 [realtime]
 enabled = true
 
@@ -69,7 +78,8 @@ double_confirm_changes = true
 secure_password_change = false
 
 [auth.mfa]
-# Phone factor is added by migration 20240729123726; not enforced by any policy.
+# Phone MFA is native in modern GoTrue (the old repo's auth-schema migration
+# for it was dropped); toggled by [auth.mfa.phone] below, not by any policy.
 max_enrolled_factors = 10
 
 [auth.mfa.phone]

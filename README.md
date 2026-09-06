@@ -20,7 +20,7 @@ See [`ROADMAP.md`](ROADMAP.md) for the phase breakdown and locked decisions.
 
 `vendor/design-system/` is a git submodule pinned to a tagged release of
 [eckeSolutions/ecke.Solutions-Design-System](https://github.com/eckeSolutions/ecke.Solutions-Design-System)
-— currently **`v0.2.0`**. This replaces the old hand-copied brand CSS values; the pin
+— currently **`v0.3.0`**. This replaces the old hand-copied brand CSS values; the pin
 is bumped deliberately, never floating.
 
 ```bash
@@ -38,6 +38,9 @@ Phase 2 (the React PWA) consumes it directly — no build step of its own:
 - **Components** — the framework-agnostic Stencil web components under
   `vendor/design-system/stencil/` (separate npm project, see its own `readme.md`).
   `stencil/` is the single owned component library; ship none of Ionic's.
+- **React wrappers** — since `v0.3.0`, `stencil/react/` emits typed, router-agnostic
+  React wrappers via `@stencil/react-output-target`. Phase 2 imports components from
+  there rather than registering custom elements by hand.
 
 Bumping the pin when a new tag lands:
 
@@ -62,16 +65,28 @@ Flutter-specific. Single-tenant: `admin` + `employee` roles, per-user RLS, no
 ```
 supabase/
   config.toml             # Supabase CLI link (the old repo had none)
-  migrations/              # 1 file — squashed current-state schema (see below)
+  migrations/             # 1 file — the current-state schema, edited in place
+  seed/                   # loaded by `db reset` in filename order
+    00_dev_baseline.sql   #   dev admin + employee accounts, company profile
+    10_dev_dummy_data.sql #   ~40 clients, 60 invoices, ~226 time entries
   functions/              # 4 Edge Functions (JMAP sync + PDF) + main/ dispatcher
 infrastructure/supabase/  # the self-hosted stack (Hetzner + Coolify), project "ecke-crm"
   docker-compose.yml      # + NEW edge-functions service; containers ecke-crm-*
   kong.yml.example        # + NEW /functions/v1 route; copy to volumes/api/kong.yml
   .env.example            # copy to .env; generate real JWT_SECRET / keys
-  seed/dev_dummy_data.sql
 ```
 
-### Migrations
+### Schema
+
+Full reference — ER diagram, table-by-table columns, RLS matrix, invoice lifecycle:
+[`docs/DATABASE_SCHEMA.md`](docs/DATABASE_SCHEMA.md).
+
+> **Pre-production rule: one migration file, edited in place.** There is no data worth
+> preserving yet, so a schema change is not migrated — edit
+> `20260101000000_initial_schema.sql`, run `supabase db reset` to drop and rebuild the
+> database from scratch, and let the seeds refill it. No incremental migration files
+> until the app goes live; at that point this rule is void and the file freezes as the
+> baseline. Details in [`docs/DATABASE_SCHEMA.md` §12](docs/DATABASE_SCHEMA.md#12-changing-the-schema).
 
 Squashed from the old repo's 9 incremental migrations into **one** current-state
 schema. The old project's granular history stays in *its* git — a greenfield repo
@@ -96,9 +111,26 @@ phone-MFA feature uses native GoTrue MFA — toggled via `[auth.mfa.phone]` in
 `config.toml`, no schema change.
 
 `supabase db reset` applies `20260101000000_initial_schema.sql` clean against a real
-Supabase stack (Postgres + GoTrue + Storage system migrations). An earlier stubbed
-smoke test also confirmed: RLS on all 9 tables, 15-min round-up, the new
-`invoice_items` → `time_entries` sync, first-user-is-admin, GoBD immutability.
+Supabase stack (Postgres + GoTrue + Storage system migrations), then seeds it. Verified
+6 Sep 2026 end to end: both dev accounts log in through GoTrue, and RLS scopes what
+they see (admin 60 invoices, employee 26). Also confirmed: RLS on all 9 tables, 15-min
+round-up, the `invoice_items` → `time_entries` sync, first-user-is-admin, GoBD
+immutability.
+
+### Dev data
+
+`db reset` rebuilds a fully populated database — no manual user creation:
+
+| Account | Password | Role |
+|---|---|---|
+| `admin@ecke.test` | `devpassword` | admin (first user inserted) |
+| `employee@ecke.test` | `devpassword` | employee |
+
+plus a filled-in `company_settings` row, ~40 clients, ~84 contacts, 8 service
+templates, 60 invoices (numbers 422+, mostly paid), ~266 line items and ~226 time
+entries — ~30 of them uninvoiced, so the billing screen has something to bill. The
+dataset is randomised but deterministic (`setseed()`). Local dev only; `.test` emails
+are non-routable by RFC 2606.
 
 ### Edge Functions
 
@@ -128,19 +160,28 @@ Isolated from any other stack: containers are `supabase_*_ecke-crm`, ports 54321
 ```bash
 # from repo root; no global install needed
 npx --yes supabase@latest start        # first run pulls images (multi-GB)
-npx --yes supabase@latest db reset     # applies the schema migration from scratch
+npx --yes supabase@latest db reset     # schema from scratch + both seed files
 ```
 
-Expect 0 errors, then (Studio at http://127.0.0.1:54323, or the printed DB URL):
+Expect 0 errors and two "Seeding data from ..." lines, then (Studio at
+http://127.0.0.1:54323, or the printed DB URL):
 
 ```sql
 select tablename, rowsecurity from pg_tables where schemaname='public' order by 1;
 -- 9 tables, all rowsecurity = t
--- create two auth users -> first profiles.role = 'admin', second = 'employee'
--- insert a draft invoice + item with linked_time_entry_id
---   -> that time_entries row flips is_invoiced = true, invoice_id set
--- set the invoice status = 'sent', then UPDATE its total_amount
+select role, count(*) from profiles group by role;   -- 1 admin, 1 employee
+select count(*) from invoices;                        -- 60, numbered from 422
+-- set an invoice's status = 'sent', then UPDATE its total_amount
 --   -> rejected by enforce_invoice_immutability
+```
+
+Then log both dev accounts in and confirm RLS scopes them — the admin sees all 60
+invoices, the employee only their own:
+
+```bash
+ANON=$(npx --yes supabase@latest status -o json | python -c "import sys,json;print(json.load(sys.stdin)['ANON_KEY'])")
+TOKEN=$(curl -s -X POST "http://127.0.0.1:54321/auth/v1/token?grant_type=password"   -H "apikey: $ANON" -H "Content-Type: application/json"   -d '{"email":"employee@ecke.test","password":"devpassword"}'   | python -c "import sys,json;print(json.load(sys.stdin)['access_token'])")
+curl -s "http://127.0.0.1:54321/rest/v1/invoices?select=id"   -H "apikey: $ANON" -H "Authorization: Bearer $TOKEN"   -H "Prefer: count=exact" -H "Range: 0-0" -D - -o /dev/null | grep -i content-range
 ```
 
 Then generate the app's DB types (used in Phase 2):
