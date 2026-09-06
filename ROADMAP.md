@@ -4,10 +4,10 @@ Living punch-list for the ecke-crm rebuild (Stencil design system + React PWA, o
 old Flutter/Dart app). The full architecture rationale is the plan referenced in
 `README.md`; this file is the sequenced "what's next", updated in place as items close.
 
-**Status (6 Sep 2026):** Phases 0-2 all **done** — design system at `v0.3.1`,
+**Status (6 Sep 2026):** Phases 0-2 all **done** — design system at `v0.3.2`,
 self-hosted stack on Postgres 17, the React app shell scaffolded and verified in a
 real browser (login, routing, nav, RLS-scoped nav visibility, the 768px swap). Phase 3
-(feature port) is next.
+(feature port) in progress — Kunden (clients + contacts) done, verified live.
 
 ---
 
@@ -17,7 +17,7 @@ real browser (login, routing, nav, RLS-scoped nav visibility, the 768px swap). P
 |---|---|
 | Framework | **React 19** (Vite + TypeScript, `npm` — not `pnpm`, see Phase 2's first item). PWA via `vite-plugin-pwa` (Workbox). |
 | App shell | **React Router v7** + **View Transitions API** (`navigate(href, { viewTransition: true })`) + headless overlays **from `ecke-ui`**. No `@ionic/react`, no Ionic platform layer — see the design system's `docs/ionic-framework-evaluation.md` Decision C (owner-confirmed 30 Aug 2026). `@ionic/core` `createGesture` may be imported standalone if a real gesture need appears. |
-| Design system | Consumed as a **git submodule** at `vendor/design-system/`, pinned to a tag, built in place (`npm ci && npm run build` inside `vendor/design-system/stencil/`). Pinned to `v0.3.1` (bumped 6 Sep 2026 — v0.3.0 then a same-day v0.3.1 for two nav icons Phase 2 needed). A private npm package is the documented fallback, not the plan. |
+| Design system | Consumed as a **git submodule** at `vendor/design-system/`, pinned to a tag, built in place (`npm ci && npm run build` inside `vendor/design-system/stencil/`). Pinned to `v0.3.2` (bumped 6 Sep 2026 three times same-day — v0.3.0, then v0.3.1 for two nav icons Phase 2 needed, then v0.3.2 for eight more icons Phase 3's Kunden feature needed). A private npm package is the documented fallback, not the plan. |
 | Backend | Supabase (self-hosted, Hetzner + Coolify), reused essentially unchanged from the retired Flutter repo. Single-tenant: `admin` + `employee`, per-user RLS, no `organization_id`. |
 | Data | `@tanstack/react-query` v5 · `@supabase/supabase-js` v2 · `react-hook-form` + `zod` · generated DB types. |
 | Offline | Installable + **online-first**. Service-worker precache of shell + DS assets; Supabase GETs `NetworkFirst`. No sync engine, no offline writes. Running stopwatch persisted to `localStorage`. |
@@ -301,12 +301,48 @@ Business logic to port (from the old repo) and the routing table live in the
 architecture plan — mirror the "Business logic to port" table into feature tickets as
 each is picked up.
 
-- [ ] **New surface the old app never built:** a UI for the `contacts` table under
-      `/kunden/:id`.
+### Kunden (clients + contacts)  ✅  *(6 Sep 2026)*
+
+List (search + "Alle"/"Mit offenen Rechnungen" filter chips + pagination), create/edit
+form (company default hourly rate pre-filled via `get_default_hourly_rate()` RPC on
+create), and detail (Stammdaten/Konditionen + 4 stat cards + a 6-month revenue bar
+chart + recent invoices/time entries, all client-side aggregated from `invoices` +
+`time_entries` — `clientDetailStats.ts`, unit-tested, ported from the old app's
+`ContactsRepositoryImpl.getClientDetail`). All CRUD verified live against the seeded
+40-client dataset with a real headless-browser run — create (rate pre-fill confirmed),
+edit, delete (with cascade to contacts), search, pagination, filter — not just typechecked.
+
+- [x] **New surface the old app never built:** a UI for the `contacts` table under
+      `/kunden/:id` — an "Ansprechpartner" card with add/edit (any authenticated
+      user)/delete (admin only, matching `contacts`' RLS — the delete button itself is
+      hidden for a non-admin, not just left to fail server-side) via a modal, not its
+      own route (no deep-link case for "editing contact X" on its own).
+- [x] Stats stay client-side aggregation (ported from the old repo, not an RPC yet) —
+      flagged here, as planned, as a candidate for a later Postgres view once data
+      volume makes the client-side fetch (100 invoices + a year of time entries per
+      client-detail visit) worth moving server-side.
+
+Two things found while building this, beyond the feature itself:
+
+- **`features/rechnungen/status.ts` moved to `lib/invoiceStatus.ts`.** Kunden's detail
+  screen needs the same invoice-status label/tone mapping Rechnungen will — the old
+  app kept the equivalent (`invoice_status_display.dart`) in `core/`, not inside its
+  `invoicing` feature folder, for the exact same reason: this repo's extensibility
+  contract forbids one feature reaching into another's internals, so anything more
+  than one feature needs belongs in `lib/`, not the first feature that happened to
+  need it.
+- **Testing a Stencil form control by CSS attribute selector doesn't work.**
+  `ecke-field[label="X"]` / `ecke-button[tone="danger"]` match nothing — most
+  `@Prop()`s aren't `reflect: true`, so they're JS properties, not DOM attributes.
+  Verification scripts need `Array.from(el.querySelectorAll(...)).find(e => e.label
+  === "X")`, not an attribute selector. Not an app bug, but worth recording since it
+  cost real time to isolate mid-verification.
+
+### Remaining feature areas
+
+- [ ] Zeiterfassung, Rechnungen, Finanzen, Einstellungen, Dashboard.
 - [ ] Cross-screen handoff (time-tracking selection → invoice editor) via query params:
       `/rechnungen/neu?client=<id>&entries=<ids>`.
-- [ ] Stats stay client-side aggregation initially (port from the old repo); flag for a
-      later Postgres view / RPC.
 
 **Done when:** all six feature areas work end to end against the live backend, with the
 old cubit tests' intent reproduced as `useInvoiceEditor` / `totals` / `useStopwatch`

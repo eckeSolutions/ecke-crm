@@ -42,7 +42,7 @@ migration wins any disagreement, so update the doc in the same commit as the sch
 
 ## Design system
 
-`vendor/design-system/` is a git submodule pinned to a tag (currently `v0.3.1`), never
+`vendor/design-system/` is a git submodule pinned to a tag (currently `v0.3.2`), never
 a floating branch. Bump it deliberately:
 
 ```bash
@@ -85,7 +85,20 @@ mode, no `prefers-color-scheme` branch. React components come from
   pair directly.
 - **`useAuth().isAdmin` is advisory only** — gates which nav items/buttons render,
   never a real permission check. RLS is the only real gate; a client-side admin
-  check bypassed by devtools must still fail server-side.
+  check bypassed by devtools must still fail server-side. Where a table's own RLS
+  restricts an action to admin (`clients`/`contacts` delete, see
+  docs/DATABASE_SCHEMA.md §6), hide that action's button for a non-admin rather than
+  showing it and letting the request 403 — Kunden's `ContactsSection` is the
+  reference.
+- **A piece of logic more than one feature needs belongs in `lib/`, not the first
+  feature that happened to need it first.** `lib/invoiceStatus.ts` (label + `ecke-badge`
+  tone per invoice status) started life inside `features/rechnungen/` and moved once
+  Kunden's detail screen needed it too — mirrors the old app, which kept the
+  equivalent in `core/`, not inside its `invoicing` feature folder.
+- **Testing a Stencil control by CSS attribute selector doesn't work in a driver
+  script.** `ecke-field[label="X"]` / `ecke-button[tone="danger"]` match nothing —
+  most `@Prop()`s aren't `reflect: true`, so they're JS properties, not DOM
+  attributes. Use `Array.from(el.querySelectorAll(...)).find(e => e.label === "X")`.
 
 ## GoBD, always
 

@@ -1,0 +1,16 @@
+/* Shared across every feature's forms/modals — a single "error text under a
+   form" and "right-aligned action row" look, instead of each screen
+   re-declaring the same two rules under a different class name. */
+
+.form-error {
+  color: var(--status-danger);
+  font-size: var(--text-sm);
+  margin: 0;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}

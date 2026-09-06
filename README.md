@@ -12,9 +12,10 @@ backend was lifted from it, see below), and the design system, vendored as a pin
 submodule at `vendor/design-system/` (see [Design system](#design-system)).
 
 **Status:** Phases 0-2 done as of 6 Sep 2026 — design system, backend, and the React
-app shell (routing, auth, nav, PWA scaffold; every screen still a placeholder). Phase
-3 (the actual feature port) is next. See [`ROADMAP.md`](ROADMAP.md) for the phase
-breakdown and locked decisions.
+app shell. Phase 3 (feature port) in progress: Kunden (clients + contacts) is real and
+live-verified; Zeiterfassung/Rechnungen/Finanzen/Einstellungen/Dashboard are still
+placeholders. See [`ROADMAP.md`](ROADMAP.md) for the phase breakdown and locked
+decisions.
 
 ---
 
@@ -22,7 +23,7 @@ breakdown and locked decisions.
 
 `vendor/design-system/` is a git submodule pinned to a tagged release of
 [eckeSolutions/ecke.Solutions-Design-System](https://github.com/eckeSolutions/ecke.Solutions-Design-System)
-— currently **`v0.3.1`**. This replaces the old hand-copied brand CSS values; the pin
+— currently **`v0.3.2`**. This replaces the old hand-copied brand CSS values; the pin
 is bumped deliberately, never floating.
 
 ```bash
@@ -170,8 +171,9 @@ src/
   shell/          # AppShell (ecke-sidebar-nav <-> ecke-bottom-nav @ 768px), nav-items,
                   # useShellNavClick (SPA-intercepts the nav components' own <a> clicks),
                   # OfflineBanner
-  features/       # dashboard, kunden, zeiterfassung, rechnungen, finanzen, einstellungen —
-                  # placeholder screens today (Phase 3 replaces them one at a time)
+  features/       # dashboard, kunden, zeiterfassung, rechnungen, finanzen, einstellungen
+                  # — kunden is real (list/create/edit/detail + contacts); the rest are
+                  # still placeholder screens (Phase 3 replaces them one at a time)
 ```
 
 ### Run it
