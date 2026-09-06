@@ -480,12 +480,12 @@ the app-facing surface.
 | `generate_next_invoice_number()` | no | `integer` | Preview only ("your next invoice will be #423"); does not consume the sequence. |
 | `get_uninvoiced_time_entries(client_uuid uuid)` | no | `SETOF time_entries` | Billable entries for a client. Not definer on purpose — the caller's RLS (own rows unless admin) still applies. |
 
-> **To confirm on the next `db reset`:** unlike the other three,
-> `generate_next_invoice_number()` has no explicit
-> `GRANT EXECUTE ... TO authenticated`, and it is not `SECURITY DEFINER`, so the caller
-> also needs `SELECT` on `public.invoice_number_seq`. Supabase's default privileges in
-> `public` normally cover both, but that is worth an explicit check from a real
-> `authenticated` session rather than an assumption.
+Note that `generate_next_invoice_number()` is the one function with no explicit
+`GRANT EXECUTE ... TO authenticated`, and it is not `SECURITY DEFINER` — so the caller
+needs both execute rights and `SELECT` on `public.invoice_number_seq`. Supabase's
+default privileges in `public` cover both: verified 6 Sep 2026 from an `authenticated`
+employee session, all four RPCs return. If a future hardening pass tightens those
+default privileges, this is the call that breaks first.
 
 ---
 
