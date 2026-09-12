@@ -55,6 +55,21 @@ Every value in the app is a `var(--token)` from that submodule. Dark-only — no
 mode, no `prefers-color-scheme` branch. React components come from
 `vendor/design-system/stencil/react/`, not hand-registered custom elements.
 
+**A design-system bug is filed as a GitHub issue, never patched here.** When something
+in `vendor/design-system/` is broken — a component that doesn't do what its props
+promise, a style that can't be reached from outside its shadow DOM, a missing export —
+open an issue on
+[eckeSolutions/ecke.Solutions-Design-System](https://github.com/eckeSolutions/ecke.Solutions-Design-System/issues)
+(`gh issue create -R eckeSolutions/ecke.Solutions-Design-System --label bug`), with a
+minimal repro, the measured evidence, the suggested fix, and which surfaces in this app
+it affects. The owner fixes it there and cuts a tag; this repo then bumps the pin. Never
+edit the submodule's source in place to unblock yourself — the pin is a tag, so a local
+edit is invisible to CI (which clones the tag) and is lost on the next checkout. An
+app-side workaround is fine in the meantime as long as it names the issue it's standing
+in for and can be retired when the bump lands. Two open examples: `ecke-button
+type="submit"` not submitting its form (#3, worked around by `src/shell/Form.tsx`) and
+`ecke-input` never filling its container (#4, no workaround possible).
+
 ## App shell conventions (Phase 2)
 
 - **Path aliases:** `@/*` → `src/*`, `@ds/*` → `vendor/design-system/*`. Defined in
@@ -78,6 +93,17 @@ mode, no `prefers-color-scheme` branch. React components come from
   `react-hook-form`'s `Controller`, reading the value from the component's own
   `onEckeInput`/`onEckeChange` event `detail` (a string), not `event.target.value`.
   `src/auth/LoginPage.tsx` is the reference implementation.
+- **A form is submitted through `src/shell/Form.tsx`, never by an
+  `ecke-button type="submit"`.** `ecke-button` is `shadow: true` and renders a plain
+  `<button type="submit">` inside its own shadow root; the HTML form-owner algorithm
+  does not cross a shadow boundary, so that button's `.form` is `null`, it is not a
+  form-associated custom element, and clicking it fires **zero** submit events on the
+  surrounding `<form>` (confirmed live in Playwright against a production build —
+  login, the client form and the contact modal were all silently inert). Implicit
+  submission via Enter inside `ecke-input` is dead for the same reason. Use `<Form>` +
+  `<SubmitButton>`, which bridge both paths with `form.requestSubmit()`. The durable
+  fix is to make `ecke-button` form-associated in the design system; until that lands,
+  never reintroduce the bare `type="submit"` shape.
 - **Each feature owns its own `routes.tsx`**, exporting a `const xRoutes = <>...
   </>;` — a JSX value (not a component function) containing `<Route>` elements —
   spread directly into `App.tsx`'s top-level `<Routes>`. A feature never edits

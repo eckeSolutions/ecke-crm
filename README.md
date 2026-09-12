@@ -195,7 +195,13 @@ npm run lint        # ESLint, scoped to src/ — see CLAUDE.md's App shell conve
 npm test            # Vitest, scoped to src/**/*.test.{ts,tsx}
 npm run build       # tsc -b && vite build -> dist/
 npm run gen:types   # regenerate src/lib/database.types.ts after any schema change
+npm run test:e2e    # Playwright — builds, then serves dist/ via vite preview
 ```
+
+The e2e suite needs a running Supabase CLI stack with the seeds loaded (it logs in as
+the real dev accounts and writes real rows — `supabase db reset` clears the
+`E2E Testkunde …` clients it leaves behind). `E2E_BASE_URL=https://… npm run test:e2e`
+runs the same specs against a deployed instance instead of a local preview.
 
 Two real bugs worth knowing about if something here seems to work halfway and then
 break in a confusing way — both covered in more depth in `CLAUDE.md`'s "App shell
@@ -208,6 +214,43 @@ conventions" and ROADMAP.md's Phase 2 entry:
   bottom-nav components render plain `<a href>` inside their own shadow DOM; a
   React-delegated synthetic click handler cannot reliably `preventDefault()` the
   browser's default navigation for it. See `src/shell/useShellNavClick.ts`.
+- **`<EckeButton type="submit">` does not submit a form.** It renders its real
+  `<button>` inside a shadow root, and the HTML form-owner algorithm doesn't cross
+  that boundary — the click fires no submit event at all, and Enter-to-submit is dead
+  for the same reason. Use `Form` / `SubmitButton` from `src/shell/Form.tsx`. Found by
+  the Phase 4 e2e suite, after three forms had shipped looking fine.
+
+---
+
+## Deploy
+
+The app ships as a static SPA in a container: a Node 24 build stage, then
+`caddy:2-alpine` serving `dist/`. The backend is the separate self-hosted Supabase
+stack in `infrastructure/supabase/`, not part of this image.
+
+```bash
+docker build -t ecke-crm   --build-arg VITE_SUPABASE_URL=https://<your-supabase-host>   --build-arg VITE_SUPABASE_ANON_KEY=<anon key> .
+docker run --rm -p 8080:80 ecke-crm
+```
+
+Three things to get right in Coolify:
+
+- **`VITE_*` are build arguments, not runtime environment variables.** Vite inlines
+  them into the bundle at build time; setting them on the service instead yields a
+  build with an undefined Supabase URL that only fails once a browser loads it.
+  Neither value is a secret (see `.env.example`) — the service-role key must never be
+  passed here.
+- **Enable submodules on the clone.** `vendor/design-system` is a git submodule and
+  `npm run setup` builds it in place during the image build.
+- **SPA fallback is mandatory** — `Caddyfile`'s `try_files {path} /index.html`. Without
+  it, a hard refresh on any non-root URL 404s, which dev never shows you because
+  Vite's dev server does this for you.
+
+`Caddyfile` also sets caching: content-hashed `/assets/*` are `immutable`, everything
+else is `no-cache`. That "everything else" is deliberately expressed as *not*
+`/assets/*` rather than as a list of filenames — Caddy evaluates a `header` matcher
+against the request path before `try_files` rewrites it, so a matcher on
+`/index.html` would silently miss `/`, `/kunden` and every other fallback URL.
 
 ---
 

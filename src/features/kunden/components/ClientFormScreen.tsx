@@ -8,6 +8,7 @@ import { useClient, useCreateClient, useDefaultHourlyRate, useUpdateClient } fro
 import { clientSchema, type ClientFormValues } from "../schema";
 import "@/shell/forms.css";
 import "./ClientFormScreen.css";
+import { Form, SubmitButton } from "@/shell/Form";
 
 const STATUS_OPTIONS = [
   { value: "active", label: "Aktiv" },
@@ -93,7 +94,7 @@ export function ClientFormScreen() {
     <>
       <EckePageHeader pageTitle={isEditing ? "Kunde bearbeiten" : "Neuer Kunde"} />
       <EckeCard surface="solid" className="client-form">
-        <form onSubmit={handleSubmit(onSubmit)} noValidate>
+        <Form onSubmit={handleSubmit(onSubmit)}>
           <Controller
             control={control}
             name="name"
@@ -271,11 +272,11 @@ export function ClientFormScreen() {
             <EckeButton type="button" emphasis="ghost" onClick={() => navigate(-1)}>
               Abbrechen
             </EckeButton>
-            <EckeButton type="submit" emphasis="primary" disabled={isSubmitting}>
+            <SubmitButton emphasis="primary" disabled={isSubmitting}>
               {isSubmitting ? "Speichern…" : "Speichern"}
-            </EckeButton>
+            </SubmitButton>
           </div>
-        </form>
+        </Form>
       </EckeCard>
     </>
   );

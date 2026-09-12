@@ -1,0 +1,36 @@
+# Static host for the built SPA. Coolify terminates TLS in front of this,
+# so plain :80 here.
+:80 {
+	root * /srv
+	encode zstd gzip
+
+	# Two *disjoint* matchers rather than a blanket rule plus an override:
+	# Caddy runs every matching `header` directive, so overlapping ones
+	# would depend on evaluation order to land on the right value.
+	#
+	# Vite emits content-hashed filenames under /assets — a changed file is
+	# a changed URL, so these can be cached forever.
+	@hashed path /assets/*
+	header @hashed Cache-Control "public, max-age=31536000, immutable"
+
+	# Everything else revalidates. That deliberately includes index.html,
+	# which names the current asset hashes, and the service worker + its
+	# registration script, which are how vite-plugin-pwa's
+	# `registerType: "autoUpdate"` ever learns there is a new version.
+	#
+	# It has to be expressed as "not /assets/*" and not as a list of
+	# filenames: `header` is evaluated against the request path as it
+	# arrived, *before* try_files rewrites it, so a matcher on
+	# `/index.html` would miss every SPA-fallback URL — `/`, `/kunden`,
+	# `/kunden/:id/bearbeiten` — and leave the app's entry document to
+	# browser heuristic caching. Verified by curl against this image.
+	@notHashed not path /assets/*
+	header @notHashed Cache-Control "no-cache"
+
+	# SPA fallback. ROADMAP.md's Phase 2 PWA item flags this exact trap:
+	# a hard refresh on a deep route (/kunden/:id/bearbeiten) only works in
+	# dev because Vite's dev server has this built in. Without it every
+	# non-root URL 404s in production.
+	try_files {path} /index.html
+	file_server
+}

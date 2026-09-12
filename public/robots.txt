@@ -1,0 +1,3 @@
+# Private, self-hosted CRM — nothing here is meant to be crawled or indexed.
+User-agent: *
+Disallow: /

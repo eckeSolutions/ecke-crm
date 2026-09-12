@@ -4,7 +4,12 @@ Living punch-list for the ecke-crm rebuild (Stencil design system + React PWA, o
 old Flutter/Dart app). The full architecture rationale is the plan referenced in
 `README.md`; this file is the sequenced "what's next", updated in place as items close.
 
-**Status (6 Sep 2026):** Phases 0-2 all **done** — design system at `v0.3.2`,
+**Status (12 Sep 2026):** Phases 0-2 **done**; Phase 3 has Kunden only; Phase 4's
+ship path (e2e, install prompt, Lighthouse, the deployable container) is **done**,
+its two PDF/feature-dependent items blocked on Phase 3. Building the e2e suite found
+that **no form in the app could be submitted by its button** — see Phase 4.
+
+Original status (6 Sep 2026): Phases 0-2 all **done** — design system at `v0.3.2`,
 self-hosted stack on Postgres 17, the React app shell scaffolded and verified in a
 real browser (login, routing, nav, RLS-scoped nav visibility, the 768px swap). Phase 3
 (feature port) in progress — Kunden (clients + contacts) done, verified live.
@@ -155,6 +160,31 @@ start — there is no compatibility shim.
         still-running self-hosted stack too if it's ever bumped past gotrue v2.151.
       `supabase/config.toml`'s `major_version` bumped 15 → 17 to match, re-verified
       `db reset` clean.
+- [x] **`sync-contacts` / `sync-calendar` verified against the real Stalwart
+      instance.** **Done 12 Sep 2026**, once real JMAP credentials existed in
+      `supabase/functions/.env` (the owner added them; that file is the CLI's
+      `functions serve --env-file` path — the self-hosted stack reads its own
+      `JMAP_*` from `infrastructure/supabase/.env`, which is still empty). This was
+      the one boundary the 5 Sep run couldn't cross. All of it passed first time —
+      no bugs found in either function:
+      - `sync-contacts` `direction: "push"` on a seeded client: **4 cards created**
+        (1 `kind: "org"` company card + 3 people), `failed: 0`, and every
+        `stalwart_contact_id` written back to `clients`/`contacts`. A second run
+        reported `created: 0, updated: 4` — idempotent, as designed. The 10s
+        per-client rate limit returns 429 on a genuinely back-to-back call (an
+        earlier "immediate" retry that returned 200 simply had >10s of wall clock
+        between the two requests, not a broken guard).
+      - `sync-calendar` `push` created a `CalendarEvent` from a `time_entries` row
+        and linked it back via `calendar_event_id`; `pull` correctly returned `[]`
+        while that event was linked, and returned the event — right title, UTC start
+        and 420-minute duration — once the local link was cleared, proving it really
+        reads the live calendar rather than short-circuiting.
+      - Auth/validation boundaries behave: no JWT → 401, `direction: "pull"` on
+        `sync-contacts` → 501.
+      **Left behind on the live server:** the 4 ContactCards and 1 CalendarEvent this
+      created are still there — removing them was attempted and refused by the
+      sandbox's irreversible-deletion guard. Delete them from Stalwart by hand
+      (ContactCards `h`,`i`,`j`,`k`; CalendarEvent `d`), or accept them.
 - [ ] Secrets hygiene: obvious placeholders in every tracked `*.example`; rotate the
       real-looking Stalwart key in the git-ignored `supabase/functions/.env`. **Checked
       5 Sep 2026:** every tracked `*.example` in this repo is already a placeholder —
@@ -352,13 +382,99 @@ tests.
 
 ## Phase 4 — PDF wiring, polish, ship  *(this repo)*
 
+Started 12 Sep 2026 on the **ship path only** — the two PDF/feature-dependent items
+below are blocked on Phase 3 (there is no invoice editor to wire a preview into, and no
+Zeiterfassung/Rechnungen screens to drive an e2e flow through).
+
 - [ ] Invoice editor: HTML/CSS live preview (approximate) + "PDF erstellen" calls
-      `generate-pdf` and streams the stored object from the bucket.
-- [ ] Playwright e2e for the three critical flows: **Auth**, **Time Tracking**,
-      **Invoicing**.
-- [ ] Install prompt; app shell loads offline; data calls show the offline banner.
-- [ ] Lighthouse PWA audit passes.
-- [ ] Coolify deploy (static `dist/`, same infra as the backend).
+      `generate-pdf` and streams the stored object from the bucket. **Blocked on
+      Phase 3's Rechnungen feature.**
+- [x] Playwright e2e — scaffolded and green for **Auth**; Time Tracking and Invoicing
+      wait on their features. **Done 12 Sep 2026.** `playwright.config.ts` + `e2e/`,
+      13 tests, run with `npm run test:e2e` (builds first, then Playwright serves
+      `dist/` via `vite preview` — the built artifact, not the dev server, because
+      production is a static `dist/` behind Caddy and the dev server's SPA fallback
+      and unbundled modules hide exactly what that step can break). Three real bugs
+      this surfaced, none of them test artefacts:
+      - **No form in the app could be submitted by its button.** `ecke-button` is
+        `shadow: true` and renders `<button type="submit">` inside its shadow root;
+        the HTML form-owner algorithm doesn't cross a shadow boundary, so `.form` is
+        `null`, it isn't a form-associated custom element, and a click produced
+        **zero** submit events (`form.requestSubmit()` produced one — the form and
+        handler were always fine). Login, the client create/edit form and the contact
+        modal were all inert; Enter-to-submit was dead for the same reason. Fixed
+        app-side with `src/shell/Form.tsx` (`Form` + `SubmitButton`, bridging both
+        paths via `requestSubmit()`), now a CLAUDE.md rule. **The durable fix belongs
+        in the design system** — make `ecke-button` a form-associated custom element
+        via `ElementInternals` so `type="submit"` behaves natively — and would let the
+        app-side bridge retire.
+      - `vite preview` binds the hostname `localhost`, which resolves to `::1` only on
+        a dual-stack Windows box, so a `127.0.0.1` base URL never connects and
+        Playwright times out waiting for a server that is already up. The config uses
+        `localhost`.
+      - Chaining `npm run build` inside Playwright's `webServer.command` puts a cold
+        `tsc -b && vite build` inside the readiness timeout. The build moved into the
+        `test:e2e` script; Playwright only serves.
+- [x] Install prompt; app shell loads offline; data calls show the offline banner.
+      **Done 12 Sep 2026.** `src/shell/useInstallPrompt.ts` + `InstallPrompt.tsx`
+      (captures `beforeinstallprompt`, suppresses Chromium's own mini-infobar,
+      re-fires it from a real user gesture, remembers a dismissal in `localStorage`,
+      hides once installed) rendered next to `OfflineBanner` above the router.
+      `e2e/pwa.spec.ts` proves the precached shell still renders with the browser
+      context forced offline — loading only, as the Offline row above says; there are
+      no offline writes to test.
+- [x] Lighthouse PWA audit — **the PWA category no longer exists.** Lighthouse 13
+      removed it outright: `installable-manifest`, `service-worker`, `maskable-icon`,
+      `splash-screen`, `themed-omnibox` are all gone, so this item cannot be satisfied
+      by running Lighthouse and was replaced by asserting the installability criteria
+      directly in `e2e/pwa.spec.ts` (manifest fields, 192/512 + maskable icons all
+      fetchable, `start_url` 200, service worker reaching `activated`, offline shell).
+      That is strictly better than the old audit — it's a regression guard, not a
+      one-off. Lighthouse 13.4.1 against the **container** (not the dev server) scores
+      **Performance 90 · Accessibility 100 · Best Practices 100 · SEO 63**. Two fixes
+      came out of it: the login page and `AppShell` had no `<main>` landmark
+      (`landmark-one-main`, a11y 98 → 100), and there was no `robots.txt`. SEO is 63
+      *by design* — the only failing SEO audit is `is-crawlable`, which is the
+      deliberate effect of a `Disallow: /` robots.txt on a private CRM. Left
+      unaddressed on purpose: `unused-css-rules`/`unused-javascript` (the 752 kB
+      single chunk — code-splitting is real work, not a Phase 4 polish item) and
+      `valid-source-maps`.
+- [x] Coolify deploy (static `dist/`, same infra as the backend). **Artifact built and
+      verified 12 Sep 2026; not yet deployed.** `Dockerfile` (Node 24 build stage →
+      `caddy:2-alpine`) + `Caddyfile`, built and run locally, then curl-checked. Three
+      things that matter on the Coolify side:
+      - **`VITE_*` must be Coolify *build arguments*, not runtime env vars.** Vite
+        inlines them at build time; setting them on the service instead produces a
+        bundle with an undefined Supabase URL that only fails in the browser.
+      - **The clone needs submodules enabled** — `vendor/design-system` is a submodule
+        and `npm run setup` builds it in place.
+      - **SPA fallback**, the trap Phase 2's PWA item flagged: `try_files {path}
+        /index.html`. A bug found while verifying it — a `header` matcher on
+        `/index.html` misses every fallback URL (`/`, `/kunden`, …), because `header`
+        is evaluated against the request path *before* `try_files` rewrites it, which
+        left the app's entry document to browser heuristic caching. Expressed as
+        "not `/assets/*`" instead; hashed assets stay `immutable`, everything else
+        `no-cache`.
+
+### Upstream design-system issues  *(12 Sep 2026)*
+
+Design-system defects are filed in that repo, never patched in the pinned submodule —
+see CLAUDE.md's "Design system" rule. Two open, both found here:
+
+- **[#3](https://github.com/eckeSolutions/ecke.Solutions-Design-System/issues/3) —
+  `ecke-button type="submit"` never submits its form.** Worked around app-side by
+  `src/shell/Form.tsx`; that bridge retires when the fix lands.
+- **[#4](https://github.com/eckeSolutions/ecke.Solutions-Design-System/issues/4) —
+  `ecke-input` never fills its container** (`.input` has `height` + `padding` but no
+  `width`, so the native input keeps its intrinsic ~20ch default: 222px inside a 595px
+  card on `/kunden/neu`). **No app-side workaround** — shadow DOM, no `::part`. Forms
+  stay visibly wrong until the pin is bumped.
+
+Also fixed here while chasing #4: `.login-page__card`'s `display: flex; gap` was doing
+nothing, because `ecke-card` is `shadow: true` and slots its children into its own
+shadow tree — layout on the host can't govern slotted children. A light-DOM
+`.login-page__stack` wrapper restores it. Not a design-system bug; correct shadow-DOM
+behaviour that any card consumer has to account for.
 
 **Done when:** the PWA is installed, deep-linkable, and produces a legally-correct
 invoice PDF from a real time-tracking → invoice flow.

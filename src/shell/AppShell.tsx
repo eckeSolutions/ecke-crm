@@ -55,7 +55,10 @@ export function AppShell() {
         />
       </div>
 
-      <div className="app-shell__main">
+      {/* A real <main> landmark, not a div: Lighthouse's landmark-one-main
+          audit failed without one, and it is the region screen-reader users
+          jump to. Styling is unaffected — the CSS targets the class. */}
+      <main className="app-shell__main">
         {/* The sidebar's own footer shows a logout glyph but emits no event
             (decorative only, see its component source) — this is the one
             real, wired sign-out affordance, placed outside either nav
@@ -71,7 +74,7 @@ export function AppShell() {
           <EckeIcon name="log-out" />
         </EckeButton>
         <Outlet />
-      </div>
+      </main>
 
       <div className="app-shell__bottom" ref={bottomNavRef}>
         <EckeBottomNav items={items} />

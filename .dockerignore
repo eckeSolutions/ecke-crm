@@ -1,0 +1,15 @@
+# Keep the build context small — but NOT vendor/design-system, which is a
+# submodule the build needs (see Dockerfile).
+.git
+node_modules
+vendor/design-system/stencil/node_modules
+vendor/design-system/stencil/react/node_modules
+dist
+.env
+.env.local
+.env.*.local
+infrastructure
+supabase
+docs
+test-results
+playwright-report

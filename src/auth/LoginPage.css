@@ -10,10 +10,15 @@
 .login-page__card {
   width: 100%;
   max-width: 360px;
+  /* No padding or flex here — ecke-card renders its own padded .card in
+     shadow DOM, and layout set on the host can't reach slotted children.
+     See .login-page__stack. */
+}
+
+.login-page__stack {
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
-  padding: var(--space-6);
 }
 
 .login-page__card form {

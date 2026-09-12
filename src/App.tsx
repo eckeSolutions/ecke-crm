@@ -9,6 +9,7 @@ import { kundenRoutes } from "@/features/kunden/routes";
 import { rechnungenRoutes } from "@/features/rechnungen/routes";
 import { zeiterfassungRoutes } from "@/features/zeiterfassung/routes";
 import { AppShell } from "@/shell/AppShell";
+import { InstallPrompt } from "@/shell/InstallPrompt";
 import { OfflineBanner } from "@/shell/OfflineBanner";
 
 /**
@@ -21,6 +22,7 @@ export function App() {
   return (
     <>
       <OfflineBanner />
+      <InstallPrompt />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route
