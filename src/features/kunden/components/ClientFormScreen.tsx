@@ -228,7 +228,7 @@ export function ClientFormScreen() {
               <EckeField label="Geburtstag">
                 <input
                   type="date"
-                  className="client-form__native-date"
+                  className="native-date-input"
                   value={field.value ?? ""}
                   onChange={(e) => field.onChange(e.target.value)}
                   onBlur={field.onBlur}

@@ -1,7 +1,5 @@
 import { Route } from "react-router-dom";
 
-import { PlaceholderScreen } from "@/shell/PlaceholderScreen";
+import { ZeiterfassungScreen } from "./components/ZeiterfassungScreen";
 
-export const zeiterfassungRoutes = (
-  <Route path="zeiterfassung" element={<PlaceholderScreen title="Zeiterfassung" subtitle="Stoppuhr & Einträge" />} />
-);
+export const zeiterfassungRoutes = <Route path="zeiterfassung" element={<ZeiterfassungScreen />} />;

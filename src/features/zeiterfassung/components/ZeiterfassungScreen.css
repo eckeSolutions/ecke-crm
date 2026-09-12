@@ -1,0 +1,13 @@
+.zeiterfassung__selection {
+  margin-bottom: var(--space-2);
+}
+
+.zeiterfassung__selection-hint {
+  color: var(--fg-3);
+  font-size: var(--text-sm);
+  margin: 0 0 var(--space-3);
+}
+
+.zeiterfassung__table {
+  margin-bottom: var(--space-5);
+}

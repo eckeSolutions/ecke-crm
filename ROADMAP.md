@@ -4,10 +4,15 @@ Living punch-list for the ecke-crm rebuild (Stencil design system + React PWA, o
 old Flutter/Dart app). The full architecture rationale is the plan referenced in
 `README.md`; this file is the sequenced "what's next", updated in place as items close.
 
-**Status (12 Sep 2026):** Phases 0-2 **done**; Phase 3 has Kunden only; Phase 4's
-ship path (e2e, install prompt, Lighthouse, the deployable container) is **done**,
-its two PDF/feature-dependent items blocked on Phase 3. Building the e2e suite found
-that **no form in the app could be submitted by its button** — see Phase 4.
+**Status (12 Sep 2026):** Phases 0-2 **done**; Phase 3 has Kunden + Zeiterfassung
+(2 of 6 feature areas); Phase 4's ship path (e2e, install prompt, Lighthouse, the
+deployable container) is **done**, its two PDF/feature-dependent items still blocked
+on Rechnungen. Design system bumped to **v0.3.3** the same day, fixing two bugs this
+repo found and filed upstream (`ecke-button type="submit"` not submitting its form;
+`ecke-input` never filling its container) — both app-side workarounds were deleted
+once the fix landed. Two more filed and still open with a named, retirable workaround
+each: the sidebar's log-out glyph emitting nothing, and `ecke-sidebar-nav` overflowing
+its own container by its padding.
 
 Original status (6 Sep 2026): Phases 0-2 all **done** — design system at `v0.3.2`,
 self-hosted stack on Postgres 17, the React app shell scaffolded and verified in a
@@ -368,11 +373,69 @@ Two things found while building this, beyond the feature itself:
   === "X")`, not an attribute selector. Not an app bug, but worth recording since it
   cost real time to isolate mid-verification.
 
+### Zeiterfassung (time tracking)  ✅  *(12 Sep 2026)*
+
+Current-month table (`ecke-table` + `ecke-table-card`, same pattern Kunden's list
+established) of the caller's own entries — RLS (`time_entries_select`) scopes this to
+`profile_id = auth.uid()` unless admin, so an employee never sees another employee's
+time without any client-side filtering; verified live logged in as both seeded
+accounts. A running stopwatch ("Zeit starten"), a manual-entry/edit modal shared by
+create and correct-a-mistake (one `<form>`, same shape as the old app's single
+`_TimeEntryFormDialog`), row-click-to-edit, multi-select delete, and the
+time-tracking → invoice cross-screen handoff via query params — all ported from the
+old app's `TimeTrackingCubit` and verified against the live seeded stack (Postgres
+RLS, the real `round_duration_to_15` trigger, not mocked).
+
+- [x] **`useStopwatch`** (ROADMAP's own "Decisions locked" row: "Running stopwatch
+      persisted to `localStorage`") — split into `stopwatch.ts` (pure elapsed/format/
+      serialize functions, 20 Vitest cases: round-trip through a fake `Storage`,
+      malformed-JSON and missing-field recovery, the `formatElapsed` edge cases) and a
+      thin `useStopwatch.ts` hook (ticks `now` every second, wraps the real
+      `localStorage`) — same pure-logic/thin-hook split as `clientDetailStats.ts` /
+      `hooks.ts` in Kunden. `stop()` deliberately does **not** clear the stored timer
+      itself; the caller only calls `discard()` once the resulting `time_entries`
+      insert actually succeeds, so a failed save leaves the timer running (and its
+      elapsed time still counting) instead of silently losing it.
+- [x] **Reload-survives-a-running-timer, verified live**, not just unit-tested: start a
+      timer, reload the page, the elapsed time and description are still there
+      (`startedAt` is a real timestamp, so elapsed time is recomputed correctly rather
+      than resuming from zero) — this is the actual behaviour the "Decisions locked"
+      row promises, confirmed against the built artifact via Playwright.
+      `e2e/zeiterfassung.spec.ts` guards it.
+- [x] **Selection-bar actions gated on both invoice-lock and client**, not just
+      client — mirrors the RLS: "Löschen"/"In Rechnung übernehmen" are hidden (not
+      merely disabled) whenever any selected entry is `is_invoiced`, and "In Rechnung
+      übernehmen" additionally requires every selected entry to share one client,
+      with an inline hint explaining whichever condition failed rather than a toast
+      that only fires on click.
+- [x] `duration.ts` (`computeDurationMinutes`, `durationHours`) sends the *raw* minute
+      span to the server and lets `round_duration_to_15` (docs/DATABASE_SCHEMA.md §5)
+      do the quarter-hour rounding — verified with a real stopwatch run: a ~3-second
+      stopped timer landed in the DB as `duration_minutes = 15`, not 1, confirming the
+      trigger fires exactly as documented rather than assuming it from the migration
+      alone.
+- [x] Cross-screen handoff (time-tracking selection → invoice editor) via query
+      params: `/rechnungen/neu?client=<id>&entries=<ids>`. Verified end to end up to
+      the navigation itself — `entries` is a comma-joined id list, `client` a single
+      id — Rechnungen doesn't exist yet to read them (still a `PlaceholderScreen`), so
+      that side of the contract is Rechnungen's own item to pick up.
+
+One thing found while building this, beyond the feature itself:
+
+- **`time_entries.profile_id` has no server default**, unlike `clients`/`contacts`
+  (whose RLS never inspects who wrote a row). Its INSERT policy requires
+  `profile_id = auth.uid()`, so every insert call site — the manual-entry modal's
+  create path and the stopwatch's stop handler — sets it explicitly from the
+  session, the same thing the old Flutter app's remote data source did by injecting
+  `uid` into the payload at its one call site. An UPDATE deliberately never touches
+  `profile_id` (an admin correcting an employee's entry must not reassign it to
+  themselves) — confirmed this is safe against the UPDATE policy's `WITH CHECK`,
+  which only re-validates whatever value ends up on the row, not a value the client
+  didn't send.
+
 ### Remaining feature areas
 
-- [ ] Zeiterfassung, Rechnungen, Finanzen, Einstellungen, Dashboard.
-- [ ] Cross-screen handoff (time-tracking selection → invoice editor) via query params:
-      `/rechnungen/neu?client=<id>&entries=<ids>`.
+- [ ] Rechnungen, Finanzen, Einstellungen, Dashboard.
 
 **Done when:** all six feature areas work end to end against the live backend, with the
 old cubit tests' intent reproduced as `useInvoiceEditor` / `totals` / `useStopwatch`
