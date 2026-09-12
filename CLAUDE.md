@@ -66,9 +66,15 @@ it affects. The owner fixes it there and cuts a tag; this repo then bumps the pi
 edit the submodule's source in place to unblock yourself — the pin is a tag, so a local
 edit is invisible to CI (which clones the tag) and is lost on the next checkout. An
 app-side workaround is fine in the meantime as long as it names the issue it's standing
-in for and can be retired when the bump lands. Two open examples: `ecke-button
-type="submit"` not submitting its form (#3, worked around by `src/shell/Form.tsx`) and
-`ecke-input` never filling its container (#4, no workaround possible).
+in for and can be retired when the bump lands. #3 (`ecke-button
+type="submit"`) and #4 (`ecke-input` width) were fixed this way and shipped in
+**v0.3.3**, which let `src/shell/Form.tsx` be deleted outright — that is the lifecycle.
+Still open: #5 (sidebar log-out glyph emits
+nothing and has no hover/focus affordance), #6 (`ecke-sidebar-nav` overflows its parent
+by its own padding), #7 (`ecke-input` has no `autocomplete`, so password managers can't
+fill a login form — **no workaround possible**), #8 (`ecke-table`'s `thead` and
+`ecke-pagination` hardcode `--surface-overlay`, staying opaque on a glass card). Each
+workaround names its issue and is scoped so it can be deleted wholesale.
 
 ## App shell conventions (Phase 2)
 
@@ -93,17 +99,15 @@ type="submit"` not submitting its form (#3, worked around by `src/shell/Form.tsx
   `react-hook-form`'s `Controller`, reading the value from the component's own
   `onEckeInput`/`onEckeChange` event `detail` (a string), not `event.target.value`.
   `src/auth/LoginPage.tsx` is the reference implementation.
-- **A form is submitted through `src/shell/Form.tsx`, never by an
-  `ecke-button type="submit"`.** `ecke-button` is `shadow: true` and renders a plain
-  `<button type="submit">` inside its own shadow root; the HTML form-owner algorithm
-  does not cross a shadow boundary, so that button's `.form` is `null`, it is not a
-  form-associated custom element, and clicking it fires **zero** submit events on the
-  surrounding `<form>` (confirmed live in Playwright against a production build —
-  login, the client form and the contact modal were all silently inert). Implicit
-  submission via Enter inside `ecke-input` is dead for the same reason. Use `<Form>` +
-  `<SubmitButton>`, which bridge both paths with `form.requestSubmit()`. The durable
-  fix is to make `ecke-button` form-associated in the design system; until that lands,
-  never reintroduce the bare `type="submit"` shape.
+- **Never put layout on an `ecke-*` host — put it on a light-DOM wrapper inside.**
+  Every shadow component slots its children into its own shadow tree, so `display:
+  flex` / `gap` / `padding` set on the host does not govern them. Two bugs came from
+  exactly this: the login card's `gap` did nothing (wordmark colliding with the first
+  label), and `.client-list__row`'s `display: flex` on an `ecke-card` host turned the
+  card's inner `.card` div into a shrink-to-fit flex item — ragged card widths with
+  the action buttons wrapped onto a second line. Wrap the children in one `<div>` and
+  style that (`.login-page__stack`, `.client-list__row`); reach for the component's
+  own props (`density="compact"`) before inventing padding.
 - **Each feature owns its own `routes.tsx`**, exporting a `const xRoutes = <>...
   </>;` — a JSX value (not a component function) containing `<Route>` elements —
   spread directly into `App.tsx`'s top-level `<Routes>`. A feature never edits
@@ -116,6 +120,15 @@ type="submit"` not submitting its form (#3, worked around by `src/shell/Form.tsx
   docs/DATABASE_SCHEMA.md §6), hide that action's button for a non-admin rather than
   showing it and letting the request 403 — Kunden's `ContactsSection` is the
   reference.
+- **Sign-out has exactly one affordance per breakpoint, and neither floats over the
+  content.** Desktop: the sidebar footer's own glyph — a bare `<svg>` that emits
+  nothing (DS issue #5), so `src/shell/useSidebarLogoutClick.ts` matches it in
+  `composedPath()`; a deliberate, single-selector exception to "don't reach into
+  shadow internals" that retires when the component emits `eckeLogout`. Below 768px
+  the sidebar is gone, so sign-out is a trailing `ecke-bottom-nav` item (no `href`,
+  driven by `eckeNavSelect`) which lands in the overflow "More" menu. There is no
+  floating button any more: it read as a duplicate of the sidebar glyph and collided
+  with page-header actions.
 - **A piece of logic more than one feature needs belongs in `lib/`, not the first
   feature that happened to need it first.** `lib/invoiceStatus.ts` (label + `ecke-badge`
   tone per invoice status) started life inside `features/rechnungen/` and moved once

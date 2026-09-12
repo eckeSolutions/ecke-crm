@@ -14,7 +14,7 @@ export function InstallPrompt() {
     <EckeNotification tone="info" dismissible onEckeDismiss={dismiss}>
       <span className="install-prompt">
         ecke CRM als App installieren?
-        <EckeButton type="button" emphasis="secondary" onClick={() => void install()}>
+        <EckeButton surface="glass" type="button" emphasis="secondary" onClick={() => void install()}>
           Installieren
         </EckeButton>
       </span>

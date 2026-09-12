@@ -456,19 +456,57 @@ Zeiterfassung/Rechnungen screens to drive an e2e flow through).
         "not `/assets/*`" instead; hashed assets stay `immutable`, everything else
         `no-cache`.
 
+### Design-system v0.3.3 + the brand-surface pass  *(12 Sep 2026)*
+
+- **Pin bumped `v0.3.2` → `v0.3.3`**, which shipped the fixes for issues #3 and #4.
+  Both verified here against a production build, and **the app-side workaround was
+  deleted outright**: `src/shell/Form.tsx` is gone and all three forms are plain
+  `<form onSubmit={…} noValidate>` + `<EckeButton type="submit">` again. Its
+  Enter-to-submit bridge turned out to be redundant too — `ecke-input` now calls
+  `form.requestSubmit()` itself — confirmed by disabling the bridge and watching the
+  Enter e2e test still pass.
+- **Hero surface everywhere, glass everywhere** (owner directive). `--gradient-hero`
+  moved off `/login` onto the whole shell — on `.app-shell`, the outer non-scrolling
+  container, so the single `<EckeCornerGlow />` (the DS's dot motif; one per surface,
+  never repeated) stays fixed behind content instead of scrolling away with it.
+  Every `ecke-card`/`ecke-button` is `surface="glass"`.
+- **Kunden list is a real `ecke-table`**, not a stack of cards. `ecke-table` renders
+  string cells only and emits no row event, so row → detail navigation listens on the
+  host and reads `composedPath()` for the `<tr>` (the `useShellNavClick` pattern), and
+  per-row actions became a proper `ecke-selection-bar`: select rows, then Bearbeiten
+  (exactly one) / Löschen (admin only, matching `clients`' RLS). Worth revisiting if
+  the DS ever grows a row-action column.
+
 ### Upstream design-system issues  *(12 Sep 2026)*
 
 Design-system defects are filed in that repo, never patched in the pinned submodule —
 see CLAUDE.md's "Design system" rule. Two open, both found here:
 
-- **[#3](https://github.com/eckeSolutions/ecke.Solutions-Design-System/issues/3) —
-  `ecke-button type="submit"` never submits its form.** Worked around app-side by
-  `src/shell/Form.tsx`; that bridge retires when the fix lands.
-- **[#4](https://github.com/eckeSolutions/ecke.Solutions-Design-System/issues/4) —
-  `ecke-input` never fills its container** (`.input` has `height` + `padding` but no
-  `width`, so the native input keeps its intrinsic ~20ch default: 222px inside a 595px
-  card on `/kunden/neu`). **No app-side workaround** — shadow DOM, no `::part`. Forms
-  stay visibly wrong until the pin is bumped.
+- ~~#3 `ecke-button type="submit"` never submits its form~~ — **fixed in v0.3.3.**
+- ~~#4 `ecke-input` never fills its container~~ — **fixed in v0.3.3.**
+- **[#5](https://github.com/eckeSolutions/ecke.Solutions-Design-System/issues/5) —
+  `ecke-sidebar-nav`'s footer log-out glyph is decorative.** A bare `<svg>`: no
+  button, no event, no slot, no accessible name. A consumer can only render a second
+  log-out control (which reads as a duplicate — the owner flagged exactly that) or
+  match the glyph in `composedPath()`. Worked around by
+  `src/shell/useSidebarLogoutClick.ts`.
+- **[#7](https://github.com/eckeSolutions/ecke.Solutions-Design-System/issues/7) —
+  `ecke-input` has no `autocomplete` prop**, so browser/third-party password managers
+  neither offer to save the login nor fill it back in. **No app-side workaround** —
+  the attribute has to land on the shadow-internal `<input>`. Passing `name` (done)
+  helps the heuristics a little, nothing more.
+- **[#8](https://github.com/eckeSolutions/ecke.Solutions-Design-System/issues/8) —
+  `ecke-table`'s `thead` and `ecke-pagination`'s host hardcode
+  `background: var(--surface-overlay)`** instead of bridging it like `--table-fill` /
+  `--table-border` / `--table-radius` already are, so a glass table reads as two opaque
+  slabs around a translucent body. Worked around by re-pointing `--surface-overlay`
+  on just those subtrees (custom properties inherit through a shadow boundary).
+- **[#6](https://github.com/eckeSolutions/ecke.Solutions-Design-System/issues/6) —
+  `ecke-sidebar-nav` overflows its parent by its own padding.** `height: 100%` +
+  `padding: var(--space-5) …` with no `box-sizing: border-box` renders it exactly 48px
+  taller than the container it was told to fill; the shell's `overflow: hidden` then
+  clips the user footer off the bottom. Worked around with a one-line
+  `box-sizing: border-box` from document CSS, which does reach a custom-element host.
 
 Also fixed here while chasing #4: `.login-page__card`'s `display: flex; gap` was doing
 nothing, because `ecke-card` is `shadow: true` and slots its children into its own

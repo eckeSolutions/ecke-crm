@@ -29,10 +29,10 @@ export function ConfirmModal({
     <EckeModal open={open} heading={heading} onEckeClose={onCancel}>
       <p>{message}</p>
       <div className="form-actions">
-        <EckeButton type="button" emphasis="ghost" onClick={onCancel} disabled={pending}>
+        <EckeButton surface="glass" type="button" emphasis="ghost" onClick={onCancel} disabled={pending}>
           Abbrechen
         </EckeButton>
-        <EckeButton type="button" emphasis="primary" tone="danger" onClick={onConfirm} disabled={pending}>
+        <EckeButton surface="glass" type="button" emphasis="primary" tone="danger" onClick={onConfirm} disabled={pending}>
           {pending ? "Wird gelöscht…" : confirmLabel}
         </EckeButton>
       </div>

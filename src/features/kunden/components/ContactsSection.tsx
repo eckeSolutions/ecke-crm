@@ -29,7 +29,7 @@ export function ContactsSection({ clientId }: { clientId: string }) {
   };
 
   return (
-    <EckeCard surface="solid" heading="Ansprechpartner" className="contacts-section">
+    <EckeCard surface="glass" heading="Ansprechpartner" className="contacts-section">
       {contactsQuery.isPending ? (
         <p>Wird geladen…</p>
       ) : contactsQuery.isError ? (
@@ -49,11 +49,12 @@ export function ContactsSection({ clientId }: { clientId: string }) {
                 {contact.phone && <span className="contacts-section__meta">{contact.phone}</span>}
               </div>
               <div className="contacts-section__actions">
-                <EckeButton type="button" emphasis="ghost" iconOnly aria-label="Bearbeiten" onClick={() => setEditing(contact)}>
+                <EckeButton surface="glass" type="button" emphasis="ghost" iconOnly aria-label="Bearbeiten" onClick={() => setEditing(contact)}>
                   <EckeIcon name="pencil" />
                 </EckeButton>
                 {isAdmin && (
                   <EckeButton
+                    surface="glass"
                     type="button"
                     emphasis="ghost"
                     tone="danger"
@@ -70,7 +71,7 @@ export function ContactsSection({ clientId }: { clientId: string }) {
         </ul>
       )}
 
-      <EckeButton type="button" emphasis="secondary" onClick={() => setEditing("new")}>
+      <EckeButton surface="glass" type="button" emphasis="secondary" onClick={() => setEditing("new")}>
         <EckeIcon slot="icon" name="plus" />
         Ansprechpartner hinzufügen
       </EckeButton>

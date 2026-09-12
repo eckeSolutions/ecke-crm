@@ -1,17 +1,11 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  EckeCard,
-  EckeField,
-  EckeInput,
-  EckeWordmark,
-} from "@ds/stencil/react";
+import { EckeButton, EckeCard, EckeCornerGlow, EckeField, EckeInput, EckeWordmark } from "@ds/stencil/react";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Navigate, useLocation } from "react-router-dom";
 import { z } from "zod";
 
 import { supabase } from "@/lib/supabase";
-import { Form, SubmitButton } from "@/shell/Form";
 
 import { useAuth } from "./AuthProvider";
 import "./LoginPage.css";
@@ -55,7 +49,8 @@ export function LoginPage() {
 
   return (
     <main className="login-page">
-      <EckeCard surface="solid" className="login-page__card">
+      <EckeCornerGlow />
+      <EckeCard surface="glass" className="login-page__card">
         {/* A light-DOM wrapper, not layout on the card itself: ecke-card is
             `shadow: true` and slots its children into a .card div in its own
             shadow tree, so flex/gap set on the host governs nothing — the
@@ -64,7 +59,7 @@ export function LoginPage() {
             and the form. */}
         <div className="login-page__stack">
           <EckeWordmark />
-          <Form onSubmit={handleSubmit(onSubmit)}>
+          <form onSubmit={handleSubmit(onSubmit)} noValidate>
             <Controller
               control={control}
               name="email"
@@ -72,6 +67,7 @@ export function LoginPage() {
                 <EckeField label="E-Mail" error={errors.email?.message}>
                   <EckeInput
                     type="email"
+                    name="email"
                     value={field.value}
                     invalid={!!errors.email}
                     onEckeInput={(e) => field.onChange(e.detail)}
@@ -87,6 +83,7 @@ export function LoginPage() {
                 <EckeField label="Passwort" error={errors.password?.message}>
                   <EckeInput
                     type="password"
+                    name="password"
                     value={field.value}
                     invalid={!!errors.password}
                     onEckeInput={(e) => field.onChange(e.detail)}
@@ -100,10 +97,10 @@ export function LoginPage() {
                 {authError}
               </p>
             )}
-            <SubmitButton disabled={isSubmitting} emphasis="primary">
+            <EckeButton surface="glass" type="submit" disabled={isSubmitting} emphasis="primary">
               {isSubmitting ? "Anmelden…" : "Anmelden"}
-            </SubmitButton>
-          </Form>
+            </EckeButton>
+          </form>
         </div>
       </EckeCard>
     </main>

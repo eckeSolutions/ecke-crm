@@ -9,7 +9,7 @@ export function PlaceholderScreen({ title, subtitle }: { title: string; subtitle
   return (
     <>
       <EckePageHeader pageTitle={title} subtitle={subtitle} />
-      <EckeCard surface="solid">
+      <EckeCard surface="glass">
         <p>Diese Ansicht folgt in Phase 3.</p>
       </EckeCard>
     </>

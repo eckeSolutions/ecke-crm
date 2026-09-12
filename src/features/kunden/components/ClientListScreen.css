@@ -12,79 +12,21 @@
   max-width: 360px;
 }
 
-.client-list__rows {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  margin-bottom: var(--space-5);
+.client-list__selection {
+  margin-bottom: var(--space-3);
 }
 
-.client-list__row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-}
-
-.client-list__row-main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  text-align: left;
-  color: inherit;
-  font: inherit;
-}
-
-.client-list__row-name {
-  flex: 2;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.client-list__row-name strong {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.client-list__row-meta {
-  font-size: var(--text-sm);
-  color: var(--fg-3);
-}
-
-.client-list__row-phone {
-  flex: 1;
-  min-width: 0;
-  color: var(--fg-2);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.client-list__row-rate {
-  flex: 0 0 auto;
-  font-weight: 700;
-}
-
-.client-list__row-actions {
-  flex: 0 0 auto;
-  display: flex;
-  gap: var(--space-2);
-}
-
-@media (max-width: 640px) {
-  .client-list__row {
-    flex-wrap: wrap;
-  }
-  .client-list__row-phone {
-    display: none;
-  }
+/* INTERIM — remove when design-system issue #8 lands.
+   ecke-table-card--glass bridges --table-fill / --table-border /
+   --table-radius into the slotted table, but ecke-table's own `thead` and
+   ecke-pagination's host both hardcode `background: var(--surface-overlay)`
+   with no custom property to override. On a glass card that reads as two
+   opaque slabs bracketing a translucent body — the header and footer
+   standing out against everything else. Custom properties DO inherit
+   through a shadow boundary, so re-pointing the token on just these two
+   subtrees reaches the internals. Scoped here deliberately, never global:
+   --surface-overlay means something elsewhere. */
+.client-list__table,
+.client-list__pagination {
+  --surface-overlay: transparent;
 }

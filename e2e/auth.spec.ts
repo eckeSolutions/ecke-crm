@@ -66,10 +66,32 @@ test.describe("Auth", () => {
   test("signing out returns to /login and the session does not survive a reload", async ({ page }) => {
     await login(page, ADMIN);
 
-    await page.getByRole("button", { name: "Abmelden" }).click();
+    // Desktop sign-out is the sidebar footer's own glyph. It is a bare
+    // <svg> with no role or accessible name (design-system issue #5), so it
+    // can only be addressed by class — Playwright's CSS engine pierces the
+    // shadow root. The floating .app-shell__signout button is the sub-768px
+    // fallback and is display:none at this viewport.
+    await page.locator(".sidebar-nav__logout").click();
     await expect(page).toHaveURL(/\/login$/);
 
     await page.goto("/kunden");
+    await expect(page).toHaveURL(/\/login$/);
+  });
+
+  test("on mobile, sign-out lives in the bottom nav's overflow menu", async ({ page }) => {
+    // Below 768px the sidebar — and with it the only desktop sign-out — is
+    // display:none, so this is the single way out. There is deliberately no
+    // floating button any more; rendering one alongside the sidebar's own
+    // glyph read as a duplicate.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await login(page, ADMIN);
+
+    await expect(page.locator(".app-shell__signout")).toHaveCount(0);
+
+    // Six nav entries plus Abmelden, against maxVisible 4 — it is in "More".
+    await page.locator("ecke-bottom-nav").getByRole("button", { name: /mehr|more/i }).click();
+    await page.getByText("Abmelden").click();
+
     await expect(page).toHaveURL(/\/login$/);
   });
 });

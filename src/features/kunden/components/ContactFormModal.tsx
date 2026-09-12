@@ -8,7 +8,6 @@ import "@/shell/forms.css";
 import type { Contact } from "../api";
 import { useCreateContact, useUpdateContact } from "../hooks";
 import { contactSchema, type ContactFormValues } from "../schema";
-import { Form, SubmitButton } from "@/shell/Form";
 
 const EMPTY_VALUES: ContactFormValues = {
   first_name: "",
@@ -79,7 +78,7 @@ export function ContactFormModal({
 
   return (
     <EckeModal open={open} heading={isEditing ? "Ansprechpartner bearbeiten" : "Neuer Ansprechpartner"} onEckeClose={onClose} size="sm">
-      <Form onSubmit={handleSubmit(onSubmit)} className="contact-form">
+      <form onSubmit={handleSubmit(onSubmit)} noValidate className="contact-form">
         <Controller
           control={control}
           name="first_name"
@@ -139,14 +138,14 @@ export function ContactFormModal({
         )}
 
         <div className="form-actions">
-          <EckeButton type="button" emphasis="ghost" onClick={onClose} disabled={isSubmitting}>
+          <EckeButton surface="glass" type="button" emphasis="ghost" onClick={onClose} disabled={isSubmitting}>
             Abbrechen
           </EckeButton>
-          <SubmitButton emphasis="primary" disabled={isSubmitting}>
+          <EckeButton surface="glass" type="submit" emphasis="primary" disabled={isSubmitting}>
             {isSubmitting ? "Speichern…" : "Speichern"}
-          </SubmitButton>
+          </EckeButton>
         </div>
-      </Form>
+      </form>
     </EckeModal>
   );
 }

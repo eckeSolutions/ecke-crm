@@ -1,16 +1,18 @@
 import {
-  EckeAvatar,
   EckeButton,
   EckeCard,
   EckeFilterChip,
-  EckeIcon,
   EckePageHeader,
   EckePagination,
   EckeSearchField,
+  EckeSelectionBar,
+  EckeTable,
+  EckeTableCard,
 } from "@ds/stencil/react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ComponentRef } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { useAuth } from "@/auth/AuthProvider";
 import { formatEuro } from "@/lib/formatters";
 import { ConfirmModal } from "@/shell/ConfirmModal";
 
@@ -22,12 +24,23 @@ type Filter = "all" | "openInvoices";
 
 const PAGE_SIZE = 10;
 
+const COLUMNS = [
+  { key: "name", label: "Kunde", sortable: false },
+  { key: "number", label: "Nr." },
+  { key: "city", label: "Ort" },
+  { key: "phone", label: "Telefon" },
+  { key: "rate", label: "Stundensatz", align: "right" as const },
+];
+
 export function ClientListScreen() {
   const navigate = useNavigate();
+  const { isAdmin } = useAuth();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [page, setPage] = useState(1);
-  const [pendingDelete, setPendingDelete] = useState<Client | null>(null);
+  const [selected, setSelected] = useState<number[]>([]);
+  const [pendingDelete, setPendingDelete] = useState<Client[] | null>(null);
+  const tableRef = useRef<ComponentRef<typeof EckeTable>>(null);
 
   const clientsQuery = useClients(search);
   const openIdsQuery = useClientIdsWithOpenInvoices();
@@ -43,27 +56,75 @@ export function ClientListScreen() {
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
   const start = (currentPage - 1) * PAGE_SIZE;
-  const pageClients = filtered.slice(start, start + PAGE_SIZE);
+  const pageClients = useMemo(() => filtered.slice(start, start + PAGE_SIZE), [filtered, start]);
 
+  const rows = useMemo(
+    () =>
+      pageClients.map((c) => ({
+        name: c.name,
+        number: c.client_number,
+        city: c.city ?? "—",
+        phone: c.phone ?? "—",
+        rate: formatEuro(c.hourly_rate ?? 0),
+      })),
+    [pageClients],
+  );
+
+  // Row click -> detail. ecke-table emits no row event and renders its
+  // <tr>s in its own shadow root, so this listens on the host and reads
+  // composedPath() — the same pattern as src/shell/useShellNavClick.ts, and
+  // for the same reason (a real addEventListener, never a JSX onClick, for
+  // an event that crosses a shadow boundary).
+  useEffect(() => {
+    // The wrapper types this ref as the Stencil component class; at
+    // runtime it is the <ecke-table> custom element itself.
+    const host = tableRef.current as unknown as HTMLElement | null;
+    if (!host) return;
+
+    const onClick = (event: MouseEvent) => {
+      if (event.defaultPrevented || event.button !== 0) return;
+      const path = event.composedPath();
+      // A click on the selection checkbox is a selection, not navigation.
+      if (path.some((n) => n instanceof HTMLElement && n.tagName === "ECKE-CHECKBOX")) return;
+
+      const tr = path.find((n): n is HTMLElement => n instanceof HTMLElement && n.tagName === "TR");
+      if (!tr?.parentElement || tr.parentElement.tagName !== "TBODY") return;
+
+      const index = Array.prototype.indexOf.call(tr.parentElement.children, tr);
+      const client = pageClients[index];
+      if (client) navigate(`/kunden/${client.id}`, { viewTransition: true });
+    };
+
+    host.addEventListener("click", onClick);
+    return () => host.removeEventListener("click", onClick);
+  }, [navigate, pageClients]);
+
+  const resetPage = () => {
+    setPage(1);
+    setSelected([]);
+  };
   const changeSearch = (value: string) => {
     setSearch(value);
-    setPage(1);
+    resetPage();
   };
   const changeFilter = (value: Filter) => {
     setFilter(value);
-    setPage(1);
+    resetPage();
   };
+
+  const selectedClients = selected.map((i) => pageClients[i]).filter((c): c is Client => !!c);
 
   const confirmDelete = async () => {
     if (!pendingDelete) return;
-    await deleteClient.mutateAsync(pendingDelete.id);
+    for (const client of pendingDelete) await deleteClient.mutateAsync(client.id);
     setPendingDelete(null);
+    setSelected([]);
   };
 
   return (
     <>
       <EckePageHeader pageTitle="Kunden">
-        <EckeButton emphasis="primary" onClick={() => navigate("/kunden/neu")}>
+        <EckeButton surface="glass" emphasis="primary" onClick={() => navigate("/kunden/neu")}>
           Neuer Kunde
         </EckeButton>
       </EckePageHeader>
@@ -87,79 +148,72 @@ export function ClientListScreen() {
       ) : clientsQuery.isError ? (
         <p role="alert">Kunden konnten nicht geladen werden.</p>
       ) : filtered.length === 0 ? (
-        <EckeCard surface="solid">
+        <EckeCard surface="glass">
           <p>{filter === "all" ? "Noch keine Kunden angelegt." : "Keine Kunden mit offenen Rechnungen."}</p>
         </EckeCard>
       ) : (
         <>
-          <div className="client-list__rows">
-            {pageClients.map((client) => (
-              <EckeCard key={client.id} surface="solid" className="client-list__row">
-                <button
-                  type="button"
-                  className="client-list__row-main"
-                  onClick={() => navigate(`/kunden/${client.id}`, { viewTransition: true })}
+          {selected.length > 0 && (
+            <EckeSelectionBar
+              count={selected.length}
+              onEckeClear={() => setSelected([])}
+              className="client-list__selection"
+            >
+              {selected.length === 1 && (
+                <EckeButton
+                  surface="glass"
+                  emphasis="secondary"
+                  onClick={() => navigate(`/kunden/${selectedClients[0]!.id}/bearbeiten`)}
                 >
-                  <EckeAvatar initials={initials(client.name)} />
-                  <span className="client-list__row-name">
-                    <strong>{client.name}</strong>
-                    <span className="client-list__row-meta">
-                      {client.client_number}
-                      {client.city ? ` · ${client.city}` : ""}
-                    </span>
-                  </span>
-                  <span className="client-list__row-phone">{client.phone ?? "—"}</span>
-                  <span className="client-list__row-rate">{formatEuro(client.hourly_rate ?? 0)}</span>
-                </button>
-                <div className="client-list__row-actions">
-                  <EckeButton
-                    type="button"
-                    emphasis="ghost"
-                    iconOnly
-                    aria-label="Bearbeiten"
-                    onClick={() => navigate(`/kunden/${client.id}/bearbeiten`)}
-                  >
-                    <EckeIcon name="pencil" />
-                  </EckeButton>
-                  <EckeButton
-                    type="button"
-                    emphasis="ghost"
-                    tone="danger"
-                    iconOnly
-                    aria-label="Löschen"
-                    onClick={() => setPendingDelete(client)}
-                  >
-                    <EckeIcon name="trash-2" />
-                  </EckeButton>
-                </div>
-              </EckeCard>
-            ))}
-          </div>
+                  Bearbeiten
+                </EckeButton>
+              )}
+              {/* clients' RLS restricts delete to admin (docs/DATABASE_SCHEMA.md
+                  §6) — hide it rather than letting the request 403, same as
+                  Kunden's ContactsSection. */}
+              {isAdmin && (
+                <EckeButton surface="glass" emphasis="secondary" tone="danger" onClick={() => setPendingDelete(selectedClients)}>
+                  Löschen
+                </EckeButton>
+              )}
+            </EckeSelectionBar>
+          )}
+
+          <EckeTableCard surface="glass" className="client-list__table">
+            <EckeTable
+              ref={tableRef}
+              columns={COLUMNS}
+              rows={rows}
+              selectable
+              onEckeSelectionChange={(e) => setSelected(e.detail.indices)}
+            />
+          </EckeTableCard>
 
           <EckePagination
+            className="client-list__pagination"
             page={currentPage}
             totalPages={pageCount}
             summary={`${start + 1}–${start + pageClients.length} von ${filtered.length} Kunden`}
-            onEckePageChange={(e) => setPage(e.detail)}
+            onEckePageChange={(e) => {
+              setPage(e.detail);
+              setSelected([]);
+            }}
           />
         </>
       )}
 
       <ConfirmModal
         open={!!pendingDelete}
-        heading="Kunde löschen?"
-        message={`„${pendingDelete?.name}" wird unwiderruflich gelöscht.`}
+        heading={pendingDelete && pendingDelete.length > 1 ? "Kunden löschen?" : "Kunde löschen?"}
+        message={
+          pendingDelete && pendingDelete.length > 1
+            ? `${pendingDelete.length} Kunden werden unwiderruflich gelöscht.`
+            : `„${pendingDelete?.[0]?.name}" wird unwiderruflich gelöscht.`
+        }
         pending={deleteClient.isPending}
         onConfirm={() => void confirmDelete()}
         onCancel={() => setPendingDelete(null)}
       />
     </>
   );
-}
-
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
-  return (parts[0]![0]! + parts[parts.length - 1]![0]!).toUpperCase();
 }

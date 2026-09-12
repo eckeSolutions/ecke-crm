@@ -35,7 +35,7 @@ export function ClientDetailScreen() {
 
       <div className="client-detail__grid">
         <div className="client-detail__master">
-          <EckeCard surface="solid" heading="Stammdaten">
+          <EckeCard surface="glass" heading="Stammdaten">
             <ul className="client-detail__info-list">
               {address && <InfoRow icon="map-pin" label={address} />}
               {client.phone && <InfoRow icon="phone" label={client.phone} />}
@@ -45,7 +45,7 @@ export function ClientDetailScreen() {
               {client.birthday && <InfoRow icon="gift" label={formatDateDe(new Date(client.birthday))} />}
             </ul>
           </EckeCard>
-          <EckeCard surface="solid" heading="Konditionen">
+          <EckeCard surface="glass" heading="Konditionen">
             <div className="client-detail__kv">
               <span>Stundensatz</span>
               <strong>{formatEuro(client.hourly_rate ?? 0)}</strong>
@@ -82,7 +82,7 @@ export function ClientDetailScreen() {
                 </EckeStatCard>
               </div>
 
-              <EckeCard surface="solid" heading="Umsatzverlauf">
+              <EckeCard surface="glass" heading="Umsatzverlauf">
                 <EckeBarChart
                   data={stats.monthlyRevenue.map((m, i, arr) => {
                     const max = Math.max(...arr.map((x) => x.amount), 0);
@@ -96,7 +96,7 @@ export function ClientDetailScreen() {
               </EckeCard>
 
               <div className="client-detail__recent-row">
-                <EckeCard surface="solid" heading="Letzte Rechnungen">
+                <EckeCard surface="glass" heading="Letzte Rechnungen">
                   {stats.recentInvoices.length === 0 ? (
                     <p className="client-detail__empty">Noch keine Rechnungen.</p>
                   ) : (
@@ -116,7 +116,7 @@ export function ClientDetailScreen() {
                     </ul>
                   )}
                 </EckeCard>
-                <EckeCard surface="solid" heading="Letzte Zeiteinträge">
+                <EckeCard surface="glass" heading="Letzte Zeiteinträge">
                   {stats.recentTimeEntries.length === 0 ? (
                     <p className="client-detail__empty">Noch keine Zeiteinträge.</p>
                   ) : (
