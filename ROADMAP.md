@@ -221,8 +221,8 @@ in the *old* repo.
 Depends on Phase 0's `v0.3.1` tag and a running Phase 1 backend. **Done 6 Sep 2026** —
 every item below verified against a real browser (Puppeteer against the dev server),
 not just "it compiles": login → dashboard → nav → sign-out, an employee vs. admin
-account seeing different nav, a direct `/einstellungen` URL hit bouncing a non-admin,
-a hard reload on a 2-level-deep route (`/kunden/:id/bearbeiten`) restoring correctly,
+account seeing different nav, a direct `/settings` URL hit bouncing a non-admin,
+a hard reload on a 2-level-deep route (`/clients/:id/edit`) restoring correctly,
 and the 768px sidebar↔bottom-nav swap, all screenshotted and read, not just asserted.
 
 - [x] Scaffold Vite + React + TypeScript (`npm`, not `pnpm` — the plan's original
@@ -256,7 +256,7 @@ and the 768px sidebar↔bottom-nav swap, all screenshotted and read, not just as
       the plan's original wording; used the DS's set directly instead.
 - [x] React Router with every route from the routing table → `PlaceholderScreen`;
       `<RequireAuth>` (redirects to `/login`, stashes the attempted path);
-      `<RequireAdmin>` on `/einstellungen` (redirects to `/`) — verified both the nav
+      `<RequireAdmin>` on `/settings` (redirects to `/`) — verified both the nav
       item hides for a non-admin **and** a direct URL hit is still blocked.
 - [x] `AuthProvider` (session + profile via TanStack Query, keyed on `session.user.id`
       + advisory `isAdmin`) + `LoginPage` (`react-hook-form` + `zod`, `ecke-input` /
@@ -353,7 +353,7 @@ chart + recent invoices/time entries, all client-side aggregated from `invoices`
 edit, delete (with cascade to contacts), search, pagination, filter — not just typechecked.
 
 - [x] **New surface the old app never built:** a UI for the `contacts` table under
-      `/kunden/:id` — an "Ansprechpartner" card with add/edit (any authenticated
+      `/clients/:id` — an "Ansprechpartner" card with add/edit (any authenticated
       user)/delete (admin only, matching `contacts`' RLS — the delete button itself is
       hidden for a non-admin, not just left to fail server-side) via a modal, not its
       own route (no deep-link case for "editing contact X" on its own).
@@ -364,7 +364,7 @@ edit, delete (with cascade to contacts), search, pagination, filter — not just
 
 Two things found while building this, beyond the feature itself:
 
-- **`features/rechnungen/status.ts` moved to `lib/invoiceStatus.ts`.** Kunden's detail
+- **`features/invoices/status.ts` moved to `lib/invoiceStatus.ts`.** Clients' detail
   screen needs the same invoice-status label/tone mapping Rechnungen will — the old
   app kept the equivalent (`invoice_status_display.dart`) in `core/`, not inside its
   `invoicing` feature folder, for the exact same reason: this repo's extensibility
@@ -406,7 +406,7 @@ RLS, the real `round_duration_to_15` trigger, not mocked).
       (`startedAt` is a real timestamp, so elapsed time is recomputed correctly rather
       than resuming from zero) — this is the actual behaviour the "Decisions locked"
       row promises, confirmed against the built artifact via Playwright.
-      `e2e/zeiterfassung.spec.ts` guards it.
+      `e2e/time-tracking.spec.ts` guards it.
 - [x] **Selection-bar actions gated on both invoice-lock and client**, not just
       client — mirrors the RLS: "Löschen"/"In Rechnung übernehmen" are hidden (not
       merely disabled) whenever any selected entry is `is_invoiced`, and "In Rechnung
@@ -420,7 +420,7 @@ RLS, the real `round_duration_to_15` trigger, not mocked).
       trigger fires exactly as documented rather than assuming it from the migration
       alone.
 - [x] Cross-screen handoff (time-tracking selection → invoice editor) via query
-      params: `/rechnungen/neu?client=<id>&entries=<ids>`. Verified end to end up to
+      params: `/invoices/new?client=<id>&entries=<ids>`. Verified end to end up to
       the navigation itself — `entries` is a comma-joined id list, `client` a single
       id — Rechnungen doesn't exist yet to read them (still a `PlaceholderScreen`), so
       that side of the contract is Rechnungen's own item to pick up.
@@ -529,7 +529,7 @@ for every other own-or-admin table in this app.
   Ausgaben render icon-less (the fixed 29-icon set has nothing that reads as "money in"/
   "money out", and forcing a mismatched icon in would be worse than an empty, correctly
   tinted slot) — a UI choice, not a bug, so nothing filed.
-- [x] `e2e/finanzen.spec.ts` runs **serial**, not parallel with itself
+- [x] `e2e/finance.spec.ts` runs **serial**, not parallel with itself
   (`test.describe.configure({ mode: "serial" })`) — the only spec file that needs this.
   `ledger_entries` has zero seeded rows (unlike every other table these specs touch),
   so two of this file's own tests running in different parallel workers raced on the
@@ -679,7 +679,7 @@ done as of Phase 3's Rechnungen feature (13 Sep 2026).
         and `npm run setup` builds it in place.
       - **SPA fallback**, the trap Phase 2's PWA item flagged: `try_files {path}
         /index.html`. A bug found while verifying it — a `header` matcher on
-        `/index.html` misses every fallback URL (`/`, `/kunden`, …), because `header`
+        `/index.html` misses every fallback URL (`/`, `/clients`, …), because `header`
         is evaluated against the request path *before* `try_files` rewrites it, which
         left the app's entry document to browser heuristic caching. Expressed as
         "not `/assets/*`" instead; hashed assets stay `immutable`, everything else

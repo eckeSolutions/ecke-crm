@@ -6,11 +6,11 @@ export type InvoiceStatus = "draft" | "sent" | "paid" | "cancelled";
 
 /**
  * Shared German label + `ecke-badge` tone mapping for an invoice's status —
- * used everywhere a status is displayed (Kundendetails, Zeiterfassung
- * selection bar, Rechnungen list/editor). Ported from the old app's
+ * used everywhere a status is displayed (the client detail screen, the
+ * time-tracking selection bar, the invoices list/editor). Ported from the old app's
  * `core/presentation/invoice_status_display.dart` — which lived in `core/`,
  * not inside its `invoicing` feature folder either, for the same reason
- * this lives in `lib/` and not `features/rechnungen/`: more than one
+ * this lives in `lib/` and not `features/invoices/`: more than one
  * feature displays an invoice's status, and this repo's extensibility
  * contract (README/ROADMAP's Part C) forbids one feature reaching into
  * another's internals.

@@ -12,10 +12,11 @@ backend was lifted from it, see below), and the design system, vendored as a pin
 submodule at `vendor/design-system/` (see [Design system](#design-system)).
 
 **Status:** Phases 0-2 done as of 6 Sep 2026 — design system, backend, and the React
-app shell. Phase 3 (feature port) in progress: Kunden (clients + contacts) is real and
-live-verified; Zeiterfassung/Rechnungen/Finanzen/Einstellungen/Dashboard are still
-placeholders. See [`ROADMAP.md`](ROADMAP.md) for the phase breakdown and locked
-decisions.
+app shell. Phase 3 (feature port) has five of six feature areas real and
+live-verified as of 13 Sep 2026 — Kunden (clients + contacts), Zeiterfassung
+(time tracking), Rechnungen (invoices), Finanzen (finance), Einstellungen (settings).
+Only Dashboard remains a placeholder. See [`ROADMAP.md`](ROADMAP.md) for the phase
+breakdown and locked decisions.
 
 ---
 
@@ -252,7 +253,7 @@ Three things to get right in Coolify:
 else is `no-cache`. That "everything else" is deliberately expressed as *not*
 `/assets/*` rather than as a list of filenames — Caddy evaluates a `header` matcher
 against the request path before `try_files` rewrites it, so a matcher on
-`/index.html` would silently miss `/`, `/kunden` and every other fallback URL.
+`/index.html` would silently miss `/`, `/clients` and every other fallback URL.
 
 ---
 

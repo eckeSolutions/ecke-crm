@@ -17,7 +17,8 @@
 
 /* A native <input type="date"|"datetime-local">, styled to sit next to
    ecke-input — the design system has no date/time control of its own
-   (ClientFormScreen's birthday field established the pattern; Zeiterfassung's
+   (ClientFormScreen's birthday field established the pattern; the time-tracking
+   feature's
    manual-entry start/end fields are the second consumer, which is what
    moved it here per CLAUDE.md's "more than one feature needs it" rule). */
 .native-date-input {

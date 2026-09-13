@@ -1,0 +1,24 @@
+.finance__stats {
+  display: flex;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-5);
+}
+
+.finance__stats > * {
+  flex: 1;
+  min-width: 200px;
+}
+
+.finance__selection {
+  margin-bottom: var(--space-2);
+}
+
+.finance__table {
+  margin-bottom: var(--space-5);
+  /* INTERIM — remove when design-system issue #8 lands (ecke-table's
+     thead and ecke-pagination hardcode --surface-overlay instead of
+     bridging it like ecke-table-card--glass's other custom properties).
+     Same workaround Clients'/TimeTracking's/Invoices' tables carry. */
+  --surface-overlay: transparent;
+}

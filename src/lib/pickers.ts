@@ -5,16 +5,17 @@ import type { Database } from "./database.types";
 
 /**
  * Fetchers AND hooks backing the small "pick a client" / "pick a service
- * template" controls that show up in more than one feature —
- * Zeiterfassung's start-timer and manual-entry modals, Rechnungen's
- * new-invoice and add-item flows. Lives here (not in either feature's own
- * `api.ts`/`hooks.ts`) per CLAUDE.md's "more than one feature needs it"
- * rule: Rechnungen became the second consumer of exactly these queries.
- * The hooks live alongside the fetchers, not just the fetchers, so the
- * query *keys* stay in one place too — `lib/queryClient.ts` already
- * establishes that `lib/` isn't React-hook-free, and two features quietly
- * retyping `["clients", "active"]` themselves is exactly the kind of
- * drift this file exists to prevent.
+ * template" controls that show up in more than one feature — the
+ * time-tracking feature's start-timer and manual-entry modals, the
+ * invoices feature's new-invoice and add-item flows. Lives here (not in
+ * either feature's own `api.ts`/`hooks.ts`) per CLAUDE.md's "more than one
+ * feature needs it" rule: invoices became the second consumer of exactly
+ * these queries. The hooks live alongside the fetchers, not just the
+ * fetchers, so the query *keys* stay in one place too —
+ * `lib/queryClient.ts` already establishes that `lib/` isn't
+ * React-hook-free, and two features quietly retyping `["clients",
+ * "active"]` themselves is exactly the kind of drift this file exists to
+ * prevent.
  */
 
 export type ActiveClient = Pick<Database["public"]["Tables"]["clients"]["Row"], "id" | "name" | "hourly_rate">;

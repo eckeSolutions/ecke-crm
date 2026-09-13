@@ -21,11 +21,11 @@ test.describe("Forms", () => {
 
   const openNewClientForm = async (page: import("@playwright/test").Page) => {
     await login(page, ADMIN);
-    await page.goto("/kunden/neu");
+    await page.goto("/clients/new");
     // Prove we're actually on the form before acting — a bounce to /login
     // would otherwise make a "navigated away" assertion pass for entirely
     // the wrong reason.
-    await expect(page).toHaveURL(/\/kunden\/neu$/);
+    await expect(page).toHaveURL(/\/clients\/new$/);
     await expect(page.getByLabel("Kunde *")).toBeVisible();
   };
 
@@ -39,7 +39,7 @@ test.describe("Forms", () => {
 
     // onSubmit navigates to the new client's detail route — an exact
     // destination, not merely "somewhere else".
-    await expect(page).toHaveURL(/\/kunden\/[0-9a-f-]{36}$/, { timeout: 15_000 });
+    await expect(page).toHaveURL(/\/clients\/[0-9a-f-]{36}$/, { timeout: 15_000 });
   });
 
   test("pressing Enter in a text field submits the form", async ({ page }) => {
@@ -50,7 +50,7 @@ test.describe("Forms", () => {
     await fill(page, "Kundennummer *", `E2E-E-${stamp}`);
     await page.getByLabel("Kundennummer *").press("Enter");
 
-    await expect(page).toHaveURL(/\/kunden\/[0-9a-f-]{36}$/, { timeout: 15_000 });
+    await expect(page).toHaveURL(/\/clients\/[0-9a-f-]{36}$/, { timeout: 15_000 });
   });
 
   test("submitting with the required fields empty shows validation, not a silent no-op", async ({ page }) => {
@@ -61,7 +61,7 @@ test.describe("Forms", () => {
 
     // Still on the form, and react-hook-form actually ran — which is only
     // observable because the submit reached it at all.
-    await expect(page).toHaveURL(/\/kunden\/neu$/);
+    await expect(page).toHaveURL(/\/clients\/new$/);
     await expect(page.getByText("Pflichtfeld").first()).toBeVisible();
   });
 });

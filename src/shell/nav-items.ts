@@ -16,14 +16,14 @@ export interface NavEntry {
 
 export const NAV_ENTRIES: readonly NavEntry[] = [
   { label: "Übersicht", icon: "layout-dashboard", path: "/" },
-  { label: "Kunden", icon: "users", path: "/kunden" },
-  { label: "Zeiterfassung", icon: "clock", path: "/zeiterfassung" },
-  { label: "Rechnungen", icon: "receipt", path: "/rechnungen" },
-  { label: "Finanzen", icon: "wallet", path: "/finanzen" },
-  { label: "Einstellungen", icon: "settings", path: "/einstellungen", adminOnly: true },
+  { label: "Kunden", icon: "users", path: "/clients" },
+  { label: "Zeiterfassung", icon: "clock", path: "/time-tracking" },
+  { label: "Rechnungen", icon: "receipt", path: "/invoices" },
+  { label: "Finanzen", icon: "wallet", path: "/finance" },
+  { label: "Einstellungen", icon: "settings", path: "/settings", adminOnly: true },
 ];
 
-/** True if `pathname` is on `entry`'s path, matching /kunden/:id etc. as "Kunden" active. */
+/** True if `pathname` is on `entry`'s path, matching /clients/:id etc. as "Kunden" active. */
 export function isNavEntryActive(entry: NavEntry, pathname: string): boolean {
   if (entry.path === "/") return pathname === "/";
   return pathname === entry.path || pathname.startsWith(`${entry.path}/`);

@@ -4,8 +4,8 @@ import "./forms.css";
 
 /**
  * Generic destructive-action confirmation — the "X löschen?" pattern used
- * across every feature (Kunden today, Rechnungen/Zeiterfassung/Finanzen
- * later). One shared component so the copy/keyboard/focus behavior stays
+ * across every feature (Clients, Invoices, TimeTracking, Finance, Settings).
+ * One shared component so the copy/keyboard/focus behavior stays
  * consistent instead of each feature rolling its own.
  */
 export function ConfirmModal({

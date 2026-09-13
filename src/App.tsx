@@ -2,12 +2,12 @@ import { Route, Routes } from "react-router-dom";
 
 import { LoginPage } from "@/auth/LoginPage";
 import { RequireAuth } from "@/auth/RequireAuth";
+import { clientsRoutes } from "@/features/clients/routes";
 import { dashboardRoutes } from "@/features/dashboard/routes";
-import { einstellungenRoutes } from "@/features/einstellungen/routes";
-import { finanzenRoutes } from "@/features/finanzen/routes";
-import { kundenRoutes } from "@/features/kunden/routes";
-import { rechnungenRoutes } from "@/features/rechnungen/routes";
-import { zeiterfassungRoutes } from "@/features/zeiterfassung/routes";
+import { financeRoutes } from "@/features/finance/routes";
+import { invoicesRoutes } from "@/features/invoices/routes";
+import { settingsRoutes } from "@/features/settings/routes";
+import { timeTrackingRoutes } from "@/features/time-tracking/routes";
 import { AppShell } from "@/shell/AppShell";
 import { InstallPrompt } from "@/shell/InstallPrompt";
 import { OfflineBanner } from "@/shell/OfflineBanner";
@@ -33,11 +33,11 @@ export function App() {
           }
         >
           {dashboardRoutes}
-          {kundenRoutes}
-          {zeiterfassungRoutes}
-          {rechnungenRoutes}
-          {finanzenRoutes}
-          {einstellungenRoutes}
+          {clientsRoutes}
+          {timeTrackingRoutes}
+          {invoicesRoutes}
+          {financeRoutes}
+          {settingsRoutes}
         </Route>
       </Routes>
     </>

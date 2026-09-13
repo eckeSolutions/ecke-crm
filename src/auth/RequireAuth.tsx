@@ -14,7 +14,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   return children;
 }
 
-/** Gate for /einstellungen — admin only. Advisory only, see AuthProvider's isAdmin doc. */
+/** Gate for /settings — admin only. Advisory only, see AuthProvider's isAdmin doc. */
 export function RequireAdmin({ children }: { children: ReactNode }) {
   const { isAdmin } = useAuth();
   if (!isAdmin) return <Navigate to="/" replace />;

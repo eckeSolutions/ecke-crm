@@ -13,7 +13,7 @@ interface AuthContextValue {
   profile: Profile | null;
   /**
    * Advisory only — gates UI affordances (showing/hiding the
-   * Einstellungen nav item, an admin-only button), nothing else. RLS is
+   * Settings nav item, an admin-only button), nothing else. RLS is
    * the real gate; the client must never treat this as authoritative
    * (docs/DATABASE_SCHEMA.md §6 / the old app's `UserRole` doc made the
    * same point).

@@ -4,6 +4,34 @@ Private, self-hosted CRM for a German Kleinunternehmer (§19 UStG). Stencil desi
 system + React PWA on Supabase. See [README.md](README.md) for the layout and
 [ROADMAP.md](ROADMAP.md) for what's next.
 
+## Code is English. UI text is German. Nothing else is.
+
+The product is German-speaking (a Kleinunternehmer's own tool), and every string a
+user actually reads — labels, headings, button text, validation messages, toasts,
+placeholders — is German. **Everything else is English**: feature folder names
+(`src/features/clients/`, not `kunden/`), file names, component/hook/function/variable
+names, route URLs (`/clients`, `/invoices/new`, `/clients/:id/edit`), CSS class names,
+TanStack Query keys, exported route consts (`clientsRoutes`, not `kundenRoutes`), test
+file names, `test.describe()`/`test()` names, and code comments. None of that is
+end-user-visible, so none of it gets the German treatment — a URL bar, a stack trace,
+and a `git blame` are all read by a developer, not a customer.
+
+`docs/DATABASE_SCHEMA.md`'s tables were already right (`clients`, `time_entries`,
+`invoices`, `ledger_entries`, `company_settings`) — this rule brings the five Phase 3
+feature folders in line with a schema that never had the problem: `kunden` →
+`src/features/clients/`, `zeiterfassung` → `time-tracking/`, `rechnungen` →
+`invoices/`, `finanzen` → `finance/`, `einstellungen` → `settings/` (13 Sep 2026).
+`dashboard/` never needed changing. Sub-paths translate too — `/neu` → `/new`,
+`/:id/bearbeiten` → `/:id/edit`.
+
+The one place German feature names stay on purpose: prose in this file, ROADMAP.md and
+README.md keeps using "Kunden"/"Zeiterfassung"/"Rechnungen"/"Finanzen"/"Einstellungen"
+as the product-area name (matching the app's own nav labels, which a German-speaking
+owner recognizes), while every literal file-path/route it cites points at the English
+code. A doc sentence like "Rechnungen's `InvoiceEditorScreen`" is naming the business
+area in prose and a real file in the same breath — both halves are correct on their
+own terms.
+
 ## Database: no incremental migrations before production
 
 There is **one** migration — `supabase/migrations/20260101000000_initial_schema.sql` —
@@ -137,7 +165,7 @@ can be deleted wholesale.
   with page-header actions.
 - **A piece of logic more than one feature needs belongs in `lib/`, not the first
   feature that happened to need it first.** `lib/invoiceStatus.ts` (label + `ecke-badge`
-  tone per invoice status) started life inside `features/rechnungen/` and moved once
+  tone per invoice status) started life inside `features/invoices/` and moved once
   Kunden's detail screen needed it too — mirrors the old app, which kept the
   equivalent in `core/`, not inside its `invoicing` feature folder.
 - **Testing a Stencil control by CSS attribute selector doesn't work in a driver
@@ -159,7 +187,7 @@ must still be `draft`, so `draft → sent` (and everything after it) requires
 `is_admin()` no matter who owns the invoice. Gate every status-change control on
 `useAuth().isAdmin` — hidden, not merely disabled, same rule as the `contacts`/
 `clients` delete buttons — and never assume "the invoice's own author" is enough.
-`src/features/rechnungen/transitions.ts` is the single source of truth for which
+`src/features/invoices/transitions.ts` is the single source of truth for which
 status can legally follow which; never offer a transition it doesn't return.
 
 **Deleting a `sent`/`paid` invoice is not exposed in the UI, even to an admin** —

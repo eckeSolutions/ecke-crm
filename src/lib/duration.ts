@@ -1,8 +1,8 @@
 /**
  * Pure duration math for time entries. Ported from the old app's
  * `TimeTrackingCubit` (`rawMinutes < 1 ? 1 : rawMinutes`) and
- * `TimeEntry.durationHours`. Lives in `lib/` (not `features/zeiterfassung/`,
- * which owns the entries themselves) because Rechnungen's invoice editor
+ * `TimeEntry.durationHours`. Lives in `lib/` (not `features/time-tracking/`,
+ * which owns the entries themselves) because the invoices feature's editor
  * is a second consumer — converting an uninvoiced time entry into a line
  * item needs the same `durationHours` — per CLAUDE.md's "more than one
  * feature needs it" rule (the same reasoning that put `invoiceStatus.ts`
