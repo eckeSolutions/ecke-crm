@@ -4,9 +4,9 @@ Living punch-list for the ecke-crm rebuild (Stencil design system + React PWA, o
 old Flutter/Dart app). The full architecture rationale is the plan referenced in
 `README.md`; this file is the sequenced "what's next", updated in place as items close.
 
-**Status (13 Sep 2026):** Phases 0-2 **done**; Phase 3 has Kunden + Zeiterfassung +
-Rechnungen + Finanzen + Einstellungen (5 of 6 feature areas — only Dashboard left);
-Phase 4's ship path is **done** and its `generate-pdf` wiring item is now unblocked and
+**Status (13 Sep 2026):** Phases 0-2 **done**; Phase 3 is **done** — Kunden +
+Zeiterfassung + Rechnungen + Finanzen + Einstellungen + Dashboard, all 6 of 6 feature
+areas live-verified; Phase 4's ship path is **done** and its `generate-pdf` wiring item is now unblocked and
 done too, verified against a real, byte-correct PDF. Design system bumped **v0.3.3 →
 v0.3.4** the same day, fixing four bugs total this repo found and filed upstream —
 `ecke-button type="submit"` not submitting its form, `ecke-input` never filling its
@@ -570,8 +570,8 @@ earlier through the admin UI.
 
 **Done when:** all six feature areas work end to end against the live backend, with the
 old cubit tests' intent reproduced as `useInvoiceEditor` / `totals` / `useStopwatch`
-tests. **5 of 6 done** (Kunden, Zeiterfassung, Rechnungen, Finanzen, Einstellungen) —
-only Dashboard remains.
+tests. **Met — 6 of 6 done** (Kunden, Zeiterfassung, Rechnungen, Finanzen,
+Einstellungen, Dashboard).
 
 ### Design system bumped to v0.3.4  *(13 Sep 2026, mid-Einstellungen)*
 
@@ -600,6 +600,46 @@ verified rather than left alone or reverted unasked.
   avatar/name). Not wired to anything yet — there's no profile screen to open — noted
   here for whichever feature eventually adds one, so it isn't rediscovered from
   scratch.
+
+### Dashboard (overview)  ✅  *(13 Sep 2026)*
+
+The sixth and last Phase 3 feature area — `PlaceholderScreen` (Phase 2's stand-in,
+now deleted, dead once every route had a real screen) replaced with a real
+`DashboardScreen`: 3 stat cards (revenue this month with a vs.-last-month delta,
+open-invoice count with an overdue-past-14-days sub-line, hours this month), a
+6-month revenue trend `ecke-bar-chart`, an `ecke-segmented-bar` splitting this year's
+`sent` vs. `paid` totals, an `ecke-recent-list` of the 5 newest invoices linking to
+`/invoices`, an `ecke-ranked-list` of the top 5 clients by this-year revenue, an
+`ecke-quick-access` card linking to each feature's "create new" screen, and (only
+when non-empty) an `ecke-upcoming-list` of clients with a birthday in the next 30
+days. Ported from the old app's `DashboardRepositoryImpl.getDashboardStats` into a
+pure, unit-tested `dashboardStats.ts` (11 Vitest cases) — client-side aggregation
+from `invoices`/`time_entries`/`clients`, same "row counts are small, a materialized
+view would be premature" reasoning as `clientDetailStats.ts`. `api.ts` is its own
+thin, feature-local set of queries rather than importing another feature's `api.ts`,
+mirroring the old app's `DashboardRemoteDataSource` (no cross-feature imports).
+Verified live against the seeded dataset — real stat-card numbers, a real revenue
+trend, real top clients, real upcoming birthdays re-anchored across a year boundary —
+not just typechecked, plus a `dashboard.spec.ts` e2e suite (structure + navigation,
+not exact totals, since the seeded data's amounts shift on every `db reset`).
+
+- [x] The Stencil design system already had every widget this screen needed
+  (`ecke-stat-card`, `ecke-bar-chart`, `ecke-segmented-bar`, `ecke-recent-list`,
+  `ecke-ranked-list`, `ecke-quick-access`, `ecke-upcoming-list`) — built for exactly
+  this screen even though nothing consumed them yet. No new design-system defect
+  found and no bump needed.
+- [x] `ecke-quick-access`'s icon vocabulary is only `'plus' | 'invoice'`, narrower than
+  the four distinct actions the old app showed (new client/invoice/time entry/ledger
+  booking) — a scope decision, not a defect (the component isn't broken, just not
+  asked to grow yet): "Neue Rechnung" gets `invoice`, the other three share `plus`.
+  Worth an icon-vocabulary issue if a future screen needs a real visual distinction
+  here, not filed now since nothing depends on it yet.
+- [x] Birthdays are parsed by month/day off the raw `"YYYY-MM-DD"` string, never
+  through `new Date(iso)` — that reads a date-only string as UTC midnight, which
+  rolls back a day in any timezone behind UTC. Same class of bug as the invoice-date
+  handling elsewhere in this app, just caught before it shipped this time.
+- [x] `PlaceholderScreen` (`src/shell/PlaceholderScreen.tsx`) deleted — Dashboard was
+  its last caller.
 
 ---
 

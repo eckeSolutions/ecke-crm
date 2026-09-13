@@ -1,7 +1,5 @@
 import { Route } from "react-router-dom";
 
-import { PlaceholderScreen } from "@/shell/PlaceholderScreen";
+import { DashboardScreen } from "./components/DashboardScreen";
 
-export const dashboardRoutes = (
-  <Route index element={<PlaceholderScreen title="Übersicht" subtitle="Dashboard" />} />
-);
+export const dashboardRoutes = <Route index element={<DashboardScreen />} />;

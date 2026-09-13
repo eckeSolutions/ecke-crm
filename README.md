@@ -12,11 +12,11 @@ backend was lifted from it, see below), and the design system, vendored as a pin
 submodule at `vendor/design-system/` (see [Design system](#design-system)).
 
 **Status:** Phases 0-2 done as of 6 Sep 2026 — design system, backend, and the React
-app shell. Phase 3 (feature port) has five of six feature areas real and
-live-verified as of 13 Sep 2026 — Kunden (clients + contacts), Zeiterfassung
-(time tracking), Rechnungen (invoices), Finanzen (finance), Einstellungen (settings).
-Only Dashboard remains a placeholder. See [`ROADMAP.md`](ROADMAP.md) for the phase
-breakdown and locked decisions.
+app shell. Phase 3 (feature port) is done as of 13 Sep 2026 — all six feature areas
+real and live-verified: Kunden (clients + contacts), Zeiterfassung (time tracking),
+Rechnungen (invoices), Finanzen (finance), Einstellungen (settings), and Dashboard
+(overview). See [`ROADMAP.md`](ROADMAP.md) for the phase breakdown and locked
+decisions.
 
 ---
 

@@ -1,0 +1,24 @@
+.dashboard__stats-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+.dashboard__row {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: var(--space-5);
+  margin-bottom: var(--space-5);
+  align-items: start;
+}
+
+.dashboard__empty {
+  color: var(--fg-3);
+}
+
+@media (max-width: 900px) {
+  .dashboard__row {
+    grid-template-columns: 1fr;
+  }
+}
