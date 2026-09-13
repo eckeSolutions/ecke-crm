@@ -1,0 +1,103 @@
+.invoice-preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  font-family: var(--font-body);
+}
+
+.invoice-preview__header {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.invoice-preview__company {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+}
+
+.invoice-preview__slogan {
+  color: var(--fg-3);
+  font-size: var(--text-sm);
+}
+
+.invoice-preview__address {
+  color: var(--fg-2);
+  font-size: var(--text-sm);
+  margin-top: var(--space-2);
+}
+
+.invoice-preview__meta {
+  text-align: right;
+  color: var(--fg-2);
+  font-size: var(--text-sm);
+}
+
+.invoice-preview__number {
+  font-size: var(--text-md);
+  font-weight: var(--weight-bold);
+  color: var(--fg-1);
+  margin-bottom: var(--space-1);
+}
+
+.invoice-preview__client {
+  color: var(--fg-2);
+  font-size: var(--text-sm);
+}
+
+.invoice-preview__client-name {
+  color: var(--fg-1);
+  font-weight: var(--weight-bold);
+  margin-bottom: var(--space-1);
+}
+
+.invoice-preview__items {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.invoice-preview__items th {
+  text-align: left;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  color: var(--text-subtle);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.invoice-preview__items td {
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--glass-border);
+  font-size: var(--text-sm);
+}
+
+.invoice-preview__empty {
+  color: var(--fg-3);
+  text-align: center;
+}
+
+.invoice-preview__num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.invoice-preview__total {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--text-md);
+  padding-top: var(--space-2);
+}
+
+.invoice-preview__ustg {
+  color: var(--fg-3);
+  font-size: var(--text-xs);
+  margin: 0;
+}
+
+.invoice-preview__footer {
+  color: var(--fg-3);
+  font-size: var(--text-xs);
+  border-top: 1px solid var(--glass-border);
+  padding-top: var(--space-3);
+}

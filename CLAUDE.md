@@ -73,8 +73,11 @@ Still open: #5 (sidebar log-out glyph emits
 nothing and has no hover/focus affordance), #6 (`ecke-sidebar-nav` overflows its parent
 by its own padding), #7 (`ecke-input` has no `autocomplete`, so password managers can't
 fill a login form — **no workaround possible**), #8 (`ecke-table`'s `thead` and
-`ecke-pagination` hardcode `--surface-overlay`, staying opaque on a glass card). Each
-workaround names its issue and is scoped so it can be deleted wholesale.
+`ecke-pagination` hardcode `--surface-overlay`, staying opaque on a glass card), #9
+(`ecke-dropdown`'s popup is unclickable inside `ecke-modal` on one page — confirmed via
+`document.elementFromPoint()`, not reproduced on a structurally identical modal
+elsewhere, root cause unconfirmed). Each workaround names its issue and is scoped so it
+can be deleted wholesale.
 
 ## App shell conventions (Phase 2)
 
@@ -145,3 +148,22 @@ An invoice that has left `draft` is immutable, and the database enforces it. Nev
 build a flow that edits a `sent`/`paid` invoice — a correction is `cancelled` plus a
 new draft. Invoice numbers come only from the server; the preview RPC is display sugar
 and the client must never compute or pass `invoice_number`.
+
+**Only an admin can move an invoice out of `draft` — even its own creator can't, if
+that creator is an employee.** `invoices_update`'s `WITH CHECK` is `(profile_id =
+auth.uid() AND status = 'draft') OR is_admin()`: for a non-admin, the *resulting* row
+must still be `draft`, so `draft → sent` (and everything after it) requires
+`is_admin()` no matter who owns the invoice. Gate every status-change control on
+`useAuth().isAdmin` — hidden, not merely disabled, same rule as the `contacts`/
+`clients` delete buttons — and never assume "the invoice's own author" is enough.
+`src/features/rechnungen/transitions.ts` is the single source of truth for which
+status can legally follow which; never offer a transition it doesn't return.
+
+**Deleting a `sent`/`paid` invoice is not exposed in the UI, even to an admin** —
+`invoices_delete`'s RLS technically allows `is_admin()` to delete a non-draft invoice,
+which is a real gap against GoBD retention (a legal document shouldn't be deletable
+once issued) that hasn't been closed at the schema level yet. Don't rely on the RLS
+matrix alone to decide what a delete affordance may do; the "Löschen" button in the
+Rechnungen editor only ever renders while `isEditable(status)` is true, and any new
+delete UI for invoices should keep that same restriction rather than following the
+database's actual permissiveness.

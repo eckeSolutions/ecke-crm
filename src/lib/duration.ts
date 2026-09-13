@@ -1,7 +1,12 @@
 /**
  * Pure duration math for time entries. Ported from the old app's
  * `TimeTrackingCubit` (`rawMinutes < 1 ? 1 : rawMinutes`) and
- * `TimeEntry.durationHours`.
+ * `TimeEntry.durationHours`. Lives in `lib/` (not `features/zeiterfassung/`,
+ * which owns the entries themselves) because Rechnungen's invoice editor
+ * is a second consumer — converting an uninvoiced time entry into a line
+ * item needs the same `durationHours` — per CLAUDE.md's "more than one
+ * feature needs it" rule (the same reasoning that put `invoiceStatus.ts`
+ * here).
  *
  * The server's `round_duration_to_15` trigger (docs/DATABASE_SCHEMA.md §5)
  * rounds `duration_minutes` up to the next quarter-hour on INSERT/UPDATE —

@@ -4,8 +4,7 @@ import type { Database } from "@/lib/database.types";
 export type TimeEntry = Database["public"]["Tables"]["time_entries"]["Row"];
 export type TimeEntryInsert = Database["public"]["Tables"]["time_entries"]["Insert"];
 export type TimeEntryUpdate = Database["public"]["Tables"]["time_entries"]["Update"];
-export type ActiveClient = Pick<Database["public"]["Tables"]["clients"]["Row"], "id" | "name" | "hourly_rate">;
-export type ServiceTemplate = Database["public"]["Tables"]["service_templates"]["Row"];
+export type { ActiveClient, ServiceTemplate } from "@/lib/pickers";
 
 /**
  * A time entry joined with its client's display name — `time_entries`
@@ -29,27 +28,6 @@ export async function fetchTimeEntriesForCurrentMonth(): Promise<TimeEntryWithCl
     .gte("start_time", start.toISOString())
     .lt("start_time", end.toISOString())
     .order("start_time", { ascending: false });
-  if (error) throw error;
-  return data;
-}
-
-/** For the "Zeit starten" / "Manueller Eintrag" client pickers — `status = 'active'` only, same as the old app's `getActiveClients()`. */
-export async function fetchActiveClients(): Promise<ActiveClient[]> {
-  const { data, error } = await supabase.from("clients").select("id, name, hourly_rate").eq("status", "active").order("name");
-  if (error) throw error;
-  return data;
-}
-
-/** A client that may since have gone inactive (or been renamed) but is still the entry's own client — merged into the picker list so editing an old entry always has a matching option, same reasoning as the old app's `pickerClients`. */
-export async function fetchClientById(id: string): Promise<ActiveClient | null> {
-  const { data, error } = await supabase.from("clients").select("id, name, hourly_rate").eq("id", id).maybeSingle();
-  if (error) throw error;
-  return data;
-}
-
-/** Quick-fill description chips — unfiltered, same as the old app's `getServiceTemplates()`. */
-export async function fetchServiceTemplates(): Promise<ServiceTemplate[]> {
-  const { data, error } = await supabase.from("service_templates").select("*").order("title");
   if (error) throw error;
   return data;
 }

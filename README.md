@@ -165,15 +165,18 @@ src/
                   # BrowserRouter > QueryClientProvider > AuthProvider > App
   App.tsx         # <Routes> — spreads every feature's routes.tsx, never defines one itself
   lib/            # supabase.ts, queryClient.ts, formatters.ts (DE locale), money.ts (§19),
+                  # invoiceStatus.ts, duration.ts, pickers.ts (client/service-template
+                  # fetchers + hooks shared by >1 feature — see CLAUDE.md),
                   # database.types.ts (generated — see "Regenerating types" below)
   auth/           # AuthProvider (session + profile + advisory isAdmin), RequireAuth,
                   # RequireAdmin, LoginPage
   shell/          # AppShell (ecke-sidebar-nav <-> ecke-bottom-nav @ 768px), nav-items,
                   # useShellNavClick (SPA-intercepts the nav components' own <a> clicks),
-                  # OfflineBanner
+                  # useSidebarLogoutClick, OfflineBanner, InstallPrompt
   features/       # dashboard, kunden, zeiterfassung, rechnungen, finanzen, einstellungen
-                  # — kunden is real (list/create/edit/detail + contacts); the rest are
-                  # still placeholder screens (Phase 3 replaces them one at a time)
+                  # — kunden/zeiterfassung/rechnungen/finanzen are real; einstellungen
+                  # and dashboard are still placeholder screens (Phase 3 replaces them
+                  # one at a time)
 ```
 
 ### Run it

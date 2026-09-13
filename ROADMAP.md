@@ -4,15 +4,17 @@ Living punch-list for the ecke-crm rebuild (Stencil design system + React PWA, o
 old Flutter/Dart app). The full architecture rationale is the plan referenced in
 `README.md`; this file is the sequenced "what's next", updated in place as items close.
 
-**Status (12 Sep 2026):** Phases 0-2 **done**; Phase 3 has Kunden + Zeiterfassung
-(2 of 6 feature areas); Phase 4's ship path (e2e, install prompt, Lighthouse, the
-deployable container) is **done**, its two PDF/feature-dependent items still blocked
-on Rechnungen. Design system bumped to **v0.3.3** the same day, fixing two bugs this
+**Status (13 Sep 2026):** Phases 0-2 **done**; Phase 3 has Kunden + Zeiterfassung +
+Rechnungen + Finanzen (4 of 6 feature areas); Phase 4's ship path is **done** and its
+`generate-pdf` wiring item is now unblocked and done too, verified against a real,
+byte-correct PDF. Design system bumped to **v0.3.3** on 12 Sep, fixing two bugs this
 repo found and filed upstream (`ecke-button type="submit"` not submitting its form;
 `ecke-input` never filling its container) — both app-side workarounds were deleted
-once the fix landed. Two more filed and still open with a named, retirable workaround
-each: the sidebar's log-out glyph emitting nothing, and `ecke-sidebar-nav` overflowing
-its own container by its padding.
+once the fix landed. Three more filed and still open, each with a named, retirable
+workaround: the sidebar's log-out glyph emitting nothing, `ecke-sidebar-nav`
+overflowing its own container by its padding, and `ecke-dropdown`'s popup being
+unclickable inside `ecke-modal` on the Rechnungen page specifically (root cause
+unconfirmed — doesn't reproduce on a structurally identical Zeiterfassung modal).
 
 Original status (6 Sep 2026): Phases 0-2 all **done** — design system at `v0.3.2`,
 self-hosted stack on Postgres 17, the React app shell scaffolded and verified in a
@@ -433,25 +435,128 @@ One thing found while building this, beyond the feature itself:
   which only re-validates whatever value ends up on the row, not a value the client
   didn't send.
 
-### Remaining feature areas
+### Rechnungen (invoices)  ✅  *(13 Sep 2026)*
 
-- [ ] Rechnungen, Finanzen, Einstellungen, Dashboard.
+List (`ecke-table`, row click → editor), a client picker for "Neue Rechnung", and one
+editor screen for both create and edit — line items (manual, or pulled in from a
+client's uninvoiced time entries), the HTML/CSS live preview, `generate-pdf` wiring,
+and GoBD-gated status transitions. Verified against the live seeded stack end to end,
+not just typechecked: created a draft, added a manual item, saved it, generated a real
+PDF (downloaded and read back — a genuine `%PDF-1.7`, correct wordmark, client, item,
+total, §19 notice), transitioned it to `sent`, and confirmed the editor locks
+(no Speichern/PDF erstellen/Löschen/remove-item buttons) the moment it does.
+
+- [x] **Only an admin can move ANY invoice out of `draft` — including its own
+  creator, if that creator is an employee.** Not a UI choice; `invoices_update`'s
+  `WITH CHECK` is `(profile_id = auth.uid() AND status = 'draft') OR is_admin()` —
+  for a non-admin, the *resulting* row must still be `draft`, so `draft → sent` is
+  the one transition even the invoice's own author cannot make themselves.
+  Confirmed by direct API call: an employee `PATCH`ing their own draft's `status` to
+  `sent` gets `42501` ("row-level security policy"), and the row stays `draft`. The
+  editor gates every status-change button on `isAdmin` accordingly — this was the old
+  app's `markSent()`, which existed on its cubit but was **never wired to any button
+  at all**; its list page instead offered "any status except the current one" from a
+  popup menu and relied on the backend to reject illegal ones. `transitions.ts`
+  (tested, 13 cases) replaces that with a real state machine matching
+  docs/DATABASE_SCHEMA.md §3 exactly: `draft→sent`, `sent→{paid,cancelled}`,
+  `paid→cancelled`, `cancelled` terminal, never back to `draft`.
+- [x] **`draft → sent` additionally requires a PDF already on file** — the editor's
+  own rule, narrower than the API allows (`generate-pdf` will happily render for a
+  `draft`, and will even let an *admin* regenerate one for a non-draft invoice as an
+  emergency escape hatch). The UI never exposes that admin override — GoBD's "issued
+  documents are frozen" spirit extends to "don't make it easy to reprint history,"
+  even where the API technically permits it for a break-glass case.
+- [x] **Deleting a non-draft invoice is not offered in the UI, even to an admin** —
+  found reading the RLS: `invoices_delete`'s `USING` is `(profile_id = auth.uid() AND
+  status = 'draft') OR is_admin()`, which means the database itself lets an admin
+  delete a `sent`/`paid` invoice outright. That reads as a real gap against GoBD
+  retention (a legal document shouldn't be deletable once issued, full stop) worth
+  the owner's attention as a future migration — not something to silently tighten
+  here without asking, so flagged rather than fixed. The app-level mitigation for now
+  is simple: the "Löschen" button only ever renders while `editable` (i.e. `draft`).
+- [x] **`ecke-dropdown`'s popup is unclickable inside `ecke-modal` on this page** —
+  [DS issue #9](https://github.com/eckeSolutions/ecke.Solutions-Design-System/issues/9).
+  A real click at the option's own screen coordinates hit `<ecke-modal>` instead,
+  confirmed with `document.elementFromPoint()` (not a Playwright artifact) — yet the
+  *same* dropdown-in-modal shape on Zeiterfassung's `StartTimerModal` resolves
+  correctly, so this isn't a blanket incompatibility; root cause unconfirmed; the
+  Rechnungen page's tall, long scrollable client table behind the modal is the only
+  difference spotted so far. `ClientPickerModal` uses `native` (a real `<select>`,
+  immune to the app's CSS) as the fix for this one call site — Zeiterfassung's
+  dropdowns are left alone, since nothing proves they share the bug.
+- [x] `profile_id` has no server default on `invoices` either (same finding as
+  `time_entries` in the Zeiterfassung entry above) — set explicitly from the session
+  on create; never touched on update, for the same reason: an admin correcting
+  someone's invoice must not reassign its ownership.
+- [x] `InvoiceItemsTable` is a plain `<table>`, not `ecke-table` — the same limit
+  Kunden's and Zeiterfassung's lists worked around with a selection bar (`ecke-table`
+  cells are strings-only with no per-row action slot), except here there's no
+  selection concept at all, just an inline remove button per row while editing.
+- [x] `durationHours` (from Zeiterfassung's `duration.ts`) and `fetchActiveClients`/
+  `fetchServiceTemplates` (from Zeiterfassung's `api.ts`) moved to `lib/duration.ts`
+  and `lib/pickers.ts` respectively — Rechnungen is the second consumer of each,
+  triggering CLAUDE.md's "more than one feature needs it" rule. `lib/pickers.ts`
+  carries the TanStack Query *hooks* too, not just the fetchers (precedent:
+  `lib/queryClient.ts` already put React Query infrastructure in `lib/`), so the
+  query *keys* — not just the request logic — stay in one place instead of two
+  features quietly retyping `["clients", "active"]` themselves.
+
+### Finanzen (manual ledger)  ✅  *(13 Sep 2026)*
+
+The simplest of the six — `ledger_entries` has no lifecycle (unlike `invoices`, no
+status, no immutability trigger), so this is a straight month-scoped CRUD screen: three
+stat cards (Einnahmen/Ausgaben/Saldo, from the `totals.ts` this repo already had
+sitting untested-against-a-screen since before Rechnungen), an `ecke-table` list, and
+one create/edit modal (type, description, amount, category, date). Row click opens the
+edit modal (same composedPath() pattern every other table in this app uses); the
+selection bar offers bulk "Löschen" only — no bulk edit, and no separate single-edit
+button, since row click already covers that one-at-a-time case the way Zeiterfassung's
+table does. Verified against the live stack: created an expense and an income entry as
+admin, confirmed Einnahmen/Ausgaben/Saldo compute correctly (€100 − €42,50 = €57,50),
+edited one to add a category, bulk-deleted both, and confirmed RLS scoping (admin sees
+an employee's booking, the employee doesn't see the admin's) plus that an admin editing
+an employee's entry never reassigns its `profile_id` — the same three things checked
+for every other own-or-admin table in this app.
+
+- [x] `profile_id` has no server default here either (the third table with this exact
+  shape, after `time_entries` and `invoices`) — set explicitly from the session on
+  create, never touched on update.
+- [x] No design-system defect found building this one — first feature in the row not to
+  turn up a new DS issue. `ecke-stat-card`'s icon slot needed no workaround: Einnahmen/
+  Ausgaben render icon-less (the fixed 29-icon set has nothing that reads as "money in"/
+  "money out", and forcing a mismatched icon in would be worse than an empty, correctly
+  tinted slot) — a UI choice, not a bug, so nothing filed.
+- [x] `e2e/finanzen.spec.ts` runs **serial**, not parallel with itself
+  (`test.describe.configure({ mode: "serial" })`) — the only spec file that needs this.
+  `ledger_entries` has zero seeded rows (unlike every other table these specs touch),
+  so two of this file's own tests running in different parallel workers raced on the
+  same "current month" scope: one test's mid-flight entry made another's "table is
+  empty" assertion fail, intermittently. Every other feature's e2e spec can run fully
+  parallel because there's always pre-existing seeded data to assert against instead
+  of a from-scratch empty state.
 
 **Done when:** all six feature areas work end to end against the live backend, with the
 old cubit tests' intent reproduced as `useInvoiceEditor` / `totals` / `useStopwatch`
-tests.
+tests. **4 of 6 done** (Kunden, Zeiterfassung, Rechnungen, Finanzen) — Einstellungen and
+Dashboard remain.
 
 ---
 
 ## Phase 4 — PDF wiring, polish, ship  *(this repo)*
 
 Started 12 Sep 2026 on the **ship path only** — the two PDF/feature-dependent items
-below are blocked on Phase 3 (there is no invoice editor to wire a preview into, and no
-Zeiterfassung/Rechnungen screens to drive an e2e flow through).
+below were blocked on Phase 3 (there was no invoice editor to wire a preview into, and
+no Zeiterfassung/Rechnungen screens to drive an e2e flow through). Both unblocked and
+done as of Phase 3's Rechnungen feature (13 Sep 2026).
 
-- [ ] Invoice editor: HTML/CSS live preview (approximate) + "PDF erstellen" calls
-      `generate-pdf` and streams the stored object from the bucket. **Blocked on
-      Phase 3's Rechnungen feature.**
+- [x] Invoice editor: HTML/CSS live preview (approximate) + "PDF erstellen" calls
+      `generate-pdf` and streams the stored object from the bucket. **Done 13 Sep
+      2026**, as part of Rechnungen's `InvoiceEditorScreen` — see that feature's own
+      ROADMAP entry above for the details (the preview panel, the PDF-before-`sent`
+      gate, the byte-verified real PDF). "Streams the stored object" ended up meaning
+      `storage.from("invoice-pdfs").download()` → an object URL opened in a new tab,
+      not a literal HTTP stream — simpler, and sufficient for a private single-file
+      PDF a user opens once.
 - [x] Playwright e2e — scaffolded and green for **Auth**; Time Tracking and Invoicing
       wait on their features. **Done 12 Sep 2026.** `playwright.config.ts` + `e2e/`,
       13 tests, run with `npm run test:e2e` (builds first, then Playwright serves

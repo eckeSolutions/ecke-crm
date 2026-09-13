@@ -10,4 +10,10 @@
 
 .zeiterfassung__table {
   margin-bottom: var(--space-5);
+  /* INTERIM — remove when design-system issue #8 lands (ecke-table's
+     thead and ecke-pagination hardcode --surface-overlay instead of
+     bridging it like ecke-table-card--glass's other custom properties).
+     Same workaround ClientListScreen.css and InvoiceListScreen.css carry —
+     this screen was built between the two and had missed it until now. */
+  --surface-overlay: transparent;
 }

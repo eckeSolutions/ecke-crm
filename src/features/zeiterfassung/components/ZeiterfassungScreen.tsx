@@ -8,7 +8,7 @@ import { ConfirmModal } from "@/shell/ConfirmModal";
 
 import { createTimeEntry } from "../api";
 import type { TimeEntryWithClient } from "../api";
-import { computeDurationMinutes, durationHours } from "../duration";
+import { computeDurationMinutes, durationHours } from "@/lib/duration";
 import { useDeleteTimeEntry, useTimeEntriesForCurrentMonth } from "../hooks";
 import { useStopwatch } from "../useStopwatch";
 import { EntryFormModal } from "./EntryFormModal";

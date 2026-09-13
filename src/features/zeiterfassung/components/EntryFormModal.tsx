@@ -8,7 +8,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import "@/shell/forms.css";
 import "./EntryFormModal.css";
 
-import { computeDurationMinutes } from "../duration";
+import { computeDurationMinutes } from "@/lib/duration";
 import { useCreateTimeEntry, usePickerClients, useUpdateTimeEntry } from "../hooks";
 import { timeEntrySchema, type TimeEntryFormValues } from "../schema";
 import type { TimeEntryWithClient } from "../api";

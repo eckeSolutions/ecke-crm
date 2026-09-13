@@ -1,0 +1,107 @@
+.invoice-editor__hint {
+  color: var(--fg-3);
+  font-size: var(--text-sm);
+  margin: 0 0 var(--space-3);
+}
+
+.invoice-editor__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-5);
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .invoice-editor__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.invoice-editor__main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+.invoice-editor__meta {
+  display: flex;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.invoice-editor__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  flex: 1;
+  min-width: 160px;
+}
+
+.invoice-editor__field--notes {
+  flex: 2;
+  min-width: 240px;
+}
+
+.invoice-editor__field textarea.native-date-input {
+  resize: vertical;
+  font: inherit;
+}
+
+.invoice-editor__items-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border-radius: var(--radius-md);
+  background: var(--glass-fill);
+  border: 1px solid var(--glass-border);
+}
+
+.invoice-editor__items-card h2 {
+  font-size: var(--text-md);
+  margin: 0;
+}
+
+.invoice-editor__items-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.invoice-editor__total {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  font-size: var(--text-md);
+  padding-top: var(--space-2);
+}
+
+.invoice-editor__uninvoiced {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.invoice-editor__uninvoiced li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.invoice-editor__uninvoiced li:last-child {
+  border-bottom: none;
+}
+
+.invoice-editor__preview {
+  min-width: 0;
+}

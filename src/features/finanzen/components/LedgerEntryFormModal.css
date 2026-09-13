@@ -1,0 +1,9 @@
+.ledger-form__row {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.ledger-form__row > * {
+  flex: 1;
+  min-width: 0;
+}

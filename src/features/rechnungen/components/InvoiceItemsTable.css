@@ -1,0 +1,41 @@
+.invoice-items-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-body);
+}
+
+.invoice-items-table__empty {
+  color: var(--fg-3);
+}
+
+.invoice-items-table th {
+  text-align: left;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  color: var(--text-subtle);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.invoice-items-table td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.invoice-items-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.invoice-items-table__num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.invoice-items-table__total {
+  font-weight: var(--weight-bold);
+}
+
+.invoice-items-table__actions {
+  width: 1%;
+  white-space: nowrap;
+}

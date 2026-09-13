@@ -1,5 +1,5 @@
 import { Route } from "react-router-dom";
 
-import { PlaceholderScreen } from "@/shell/PlaceholderScreen";
+import { FinanzenScreen } from "./components/FinanzenScreen";
 
-export const finanzenRoutes = <Route path="finanzen" element={<PlaceholderScreen title="Finanzen" subtitle="Ledger" />} />;
+export const finanzenRoutes = <Route path="finanzen" element={<FinanzenScreen />} />;
