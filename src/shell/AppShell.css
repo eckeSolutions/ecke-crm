@@ -39,16 +39,6 @@
   min-height: 0;
 }
 
-/* INTERIM — remove when design-system issue #6 lands. ecke-sidebar-nav's
-   host is `height: 100%` with `padding: var(--space-5) …` and no
-   box-sizing, so it renders exactly 2 × 24px taller than the container it
-   was told to fill; .app-shell's overflow:hidden then clips its user
-   footer off the bottom. Document CSS does reach a custom-element host,
-   so this corrects it until the component does. */
-.app-shell__sidebar ecke-sidebar-nav {
-  box-sizing: border-box;
-}
-
 .app-shell__bottom {
   display: none;
 }

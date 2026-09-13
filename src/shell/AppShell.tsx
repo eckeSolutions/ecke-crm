@@ -6,7 +6,6 @@ import { useAuth } from "@/auth/AuthProvider";
 
 import "./AppShell.css";
 import { isNavEntryActive, NAV_ENTRIES } from "./nav-items";
-import { useSidebarLogoutClick } from "./useSidebarLogoutClick";
 import { useShellNavClick } from "./useShellNavClick";
 
 function initials(name: string): string {
@@ -31,7 +30,6 @@ export function AppShell() {
   const bottomNavRef = useRef<HTMLDivElement>(null);
   useShellNavClick(sidebarRef);
   useShellNavClick(bottomNavRef);
-  useSidebarLogoutClick(sidebarRef, () => void signOut());
 
   const visibleEntries = NAV_ENTRIES.filter((entry) => !entry.adminOnly || profile?.role === "admin");
   const items = visibleEntries.map((entry) => ({
@@ -68,6 +66,7 @@ export function AppShell() {
           user={user}
           collapsed={collapsed}
           onEckeCollapse={(e) => setCollapsed(e.detail)}
+          onEckeLogout={() => void signOut()}
         />
       </div>
 

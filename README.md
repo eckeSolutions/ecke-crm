@@ -23,7 +23,7 @@ decisions.
 
 `vendor/design-system/` is a git submodule pinned to a tagged release of
 [eckeSolutions/ecke.Solutions-Design-System](https://github.com/eckeSolutions/ecke.Solutions-Design-System)
-— currently **`v0.3.2`**. This replaces the old hand-copied brand CSS values; the pin
+— currently **`v0.3.4`**. This replaces the old hand-copied brand CSS values; the pin
 is bumped deliberately, never floating.
 
 ```bash
@@ -172,11 +172,10 @@ src/
                   # RequireAdmin, LoginPage
   shell/          # AppShell (ecke-sidebar-nav <-> ecke-bottom-nav @ 768px), nav-items,
                   # useShellNavClick (SPA-intercepts the nav components' own <a> clicks),
-                  # useSidebarLogoutClick, OfflineBanner, InstallPrompt
+                  # OfflineBanner, InstallPrompt
   features/       # dashboard, kunden, zeiterfassung, rechnungen, finanzen, einstellungen
-                  # — kunden/zeiterfassung/rechnungen/finanzen are real; einstellungen
-                  # and dashboard are still placeholder screens (Phase 3 replaces them
-                  # one at a time)
+                  # — every feature but dashboard is real; dashboard is still a
+                  # placeholder screen (Phase 3's last one)
 ```
 
 ### Run it

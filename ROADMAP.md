@@ -5,16 +5,19 @@ old Flutter/Dart app). The full architecture rationale is the plan referenced in
 `README.md`; this file is the sequenced "what's next", updated in place as items close.
 
 **Status (13 Sep 2026):** Phases 0-2 **done**; Phase 3 has Kunden + Zeiterfassung +
-Rechnungen + Finanzen (4 of 6 feature areas); Phase 4's ship path is **done** and its
-`generate-pdf` wiring item is now unblocked and done too, verified against a real,
-byte-correct PDF. Design system bumped to **v0.3.3** on 12 Sep, fixing two bugs this
-repo found and filed upstream (`ecke-button type="submit"` not submitting its form;
-`ecke-input` never filling its container) — both app-side workarounds were deleted
-once the fix landed. Three more filed and still open, each with a named, retirable
-workaround: the sidebar's log-out glyph emitting nothing, `ecke-sidebar-nav`
-overflowing its own container by its padding, and `ecke-dropdown`'s popup being
-unclickable inside `ecke-modal` on the Rechnungen page specifically (root cause
-unconfirmed — doesn't reproduce on a structurally identical Zeiterfassung modal).
+Rechnungen + Finanzen + Einstellungen (5 of 6 feature areas — only Dashboard left);
+Phase 4's ship path is **done** and its `generate-pdf` wiring item is now unblocked and
+done too, verified against a real, byte-correct PDF. Design system bumped **v0.3.3 →
+v0.3.4** the same day, fixing four bugs total this repo found and filed upstream —
+`ecke-button type="submit"` not submitting its form, `ecke-input` never filling its
+container, the sidebar's log-out glyph emitting nothing, and `ecke-sidebar-nav`
+overflowing its own container by its padding — every one confirmed fixed by
+re-verifying live, not by trusting the commit messages, and every app-side workaround
+for them deleted. Three still open: `ecke-input` has no `autocomplete` (no workaround possible),
+`ecke-table`/`ecke-pagination` hardcode `--surface-overlay` (worked around per-table),
+and `ecke-dropdown`'s popup is unclickable inside `ecke-modal` on the Rechnungen page
+specifically (root cause unconfirmed — doesn't reproduce on a structurally identical
+Zeiterfassung modal; worked around with a native `<select>`).
 
 Original status (6 Sep 2026): Phases 0-2 all **done** — design system at `v0.3.2`,
 self-hosted stack on Postgres 17, the React app shell scaffolded and verified in a
@@ -535,10 +538,68 @@ for every other own-or-admin table in this app.
   parallel because there's always pre-existing seeded data to assert against instead
   of a from-scratch empty state.
 
+### Einstellungen (company settings)  ✅  *(13 Sep 2026)*
+
+Admin-only (the route is `RequireAdmin`-gated, and `company_settings`'s own RLS is
+admin-only regardless — the two agree, not just the one gating the other). Three
+independently-saved cards on the one `company_settings` singleton row: Firmenprofil
+(the letterhead every invoice PDF uses verbatim, via `get_company_letterhead()`),
+Standard-Stundensatz (the one field of this table an employee ever reaches, via
+`get_default_hourly_rate()`), and JMAP/DAV connection details plus a write-only
+"Ersetzen" flow for the Vault-backed secret. Verified against the live stack end to
+end: saved all three cards independently (confirmed each one's mutation only ever
+touches its own columns — editing the profile doesn't disturb an unsaved edit to the
+rate), replaced the JMAP secret through the real `set-jmap-secret` Edge Function and
+read the plaintext back out of `vault.decrypted_secrets` to confirm it matched exactly
+what was typed, watched the "konfiguriert" badge flip live off that Vault write, and
+confirmed an employee's `get_default_hourly_rate()` call reflects a rate saved seconds
+earlier through the admin UI.
+
+- [x] **MFA (phone) deliberately not built.** The old app had a full phone-MFA
+  enrollment dialog (`mfa_enrollment_cubit.dart`, a two-step send-code/verify-code
+  flow against GoTrue's native phone MFA). `supabase/config.toml`'s `[auth.mfa.phone]`
+  has `enroll_enabled = false` / `verify_enabled = false`, and no SMS provider is
+  wired into the self-hosted stack — building the UI now would call an API GoTrue
+  itself rejects. A card that can't work is worse than no card; this is a config +
+  infra decision for the owner, not something a UI pass should route around.
+- [x] Same `profile_id`-has-no-default shape does **not** apply here — `company_settings`
+  is a fixed `id = true` singleton with no owner column at all (docs/DATABASE_SCHEMA.md
+  §2), so unlike every per-row table in this app, there's no "whose row is this"
+  question to get right.
+- [x] No new design-system defect found — same as Finanzen.
+
 **Done when:** all six feature areas work end to end against the live backend, with the
 old cubit tests' intent reproduced as `useInvoiceEditor` / `totals` / `useStopwatch`
-tests. **4 of 6 done** (Kunden, Zeiterfassung, Rechnungen, Finanzen) — Einstellungen and
-Dashboard remain.
+tests. **5 of 6 done** (Kunden, Zeiterfassung, Rechnungen, Finanzen, Einstellungen) —
+only Dashboard remains.
+
+### Design system bumped to v0.3.4  *(13 Sep 2026, mid-Einstellungen)*
+
+Not this repo's own doing — the submodule's checked-out commit moved from `v0.3.3` to
+`v0.3.4` during this session (presumably the owner working in that repo in parallel);
+noticed via `git status` showing `vendor/design-system` and `package-lock.json`
+modified with no corresponding action taken here. Rebuilt (`npm run setup`) and
+verified rather than left alone or reverted unasked.
+
+- [x] **Issues #5 and #6 are both genuinely fixed**, even though neither was closed on
+  GitHub when the tag was cut — closed here after independently verifying each,
+  not on the strength of the commit messages alone: `ecke-sidebar-nav`'s footer
+  log-out glyph is now a real `<button>` emitting a new `eckeLogout` event (confirmed
+  live — attached a listener, clicked it, got the event), with proper
+  `focus-ring`/`hover`/`pressed`/`touch-target` states the original bare `<svg>` had
+  none of; and the host gained `box-sizing: border-box`, confirmed live — the rail
+  now measures exactly 800px inside an 800px container, not 848px. Both app-side
+  workarounds (`src/shell/useSidebarLogoutClick.ts`, `AppShell.css`'s `box-sizing`
+  override) deleted; `AppShell` now wires `onEckeLogout={() => void signOut()}`
+  directly on `<EckeSidebarNav>`.
+- [x] Issues #7 (`ecke-input` autocomplete), #8 (`ecke-table`/`ecke-pagination`
+  `--surface-overlay`), and #9 (`ecke-dropdown`-in-`ecke-modal`) are **not** touched by
+  this bump (`v0.3.3..v0.3.4`'s only two commits are sidebar rail-width and wordmark
+  sizing) — their workarounds stay in place.
+- [x] A new `eckeProfile` event also shipped on the sidebar's user row (clicking the
+  avatar/name). Not wired to anything yet — there's no profile screen to open — noted
+  here for whichever feature eventually adds one, so it isn't rediscovered from
+  scratch.
 
 ---
 

@@ -1,14 +1,15 @@
 import { Route } from "react-router-dom";
 
 import { RequireAdmin } from "@/auth/RequireAuth";
-import { PlaceholderScreen } from "@/shell/PlaceholderScreen";
+
+import { EinstellungenScreen } from "./components/EinstellungenScreen";
 
 export const einstellungenRoutes = (
   <Route
     path="einstellungen"
     element={
       <RequireAdmin>
-        <PlaceholderScreen title="Einstellungen" subtitle="Firmenprofil, JMAP, MFA" />
+        <EinstellungenScreen />
       </RequireAdmin>
     }
   />

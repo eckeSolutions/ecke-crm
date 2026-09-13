@@ -42,7 +42,7 @@ migration wins any disagreement, so update the doc in the same commit as the sch
 
 ## Design system
 
-`vendor/design-system/` is a git submodule pinned to a tag (currently `v0.3.2`), never
+`vendor/design-system/` is a git submodule pinned to a tag (currently `v0.3.4`), never
 a floating branch. Bump it deliberately:
 
 ```bash
@@ -66,13 +66,16 @@ it affects. The owner fixes it there and cuts a tag; this repo then bumps the pi
 edit the submodule's source in place to unblock yourself — the pin is a tag, so a local
 edit is invisible to CI (which clones the tag) and is lost on the next checkout. An
 app-side workaround is fine in the meantime as long as it names the issue it's standing
-in for and can be retired when the bump lands. #3 (`ecke-button
-type="submit"`) and #4 (`ecke-input` width) were fixed this way and shipped in
-**v0.3.3**, which let `src/shell/Form.tsx` be deleted outright — that is the lifecycle.
-Still open: #5 (sidebar log-out glyph emits
-nothing and has no hover/focus affordance), #6 (`ecke-sidebar-nav` overflows its parent
-by its own padding), #7 (`ecke-input` has no `autocomplete`, so password managers can't
-fill a login form — **no workaround possible**), #8 (`ecke-table`'s `thead` and
+in for and can be retired when the bump lands. Retire the workaround **only after
+independently re-verifying the fix live** — don't take a commit message or a version
+bump on faith; #5/#6 below were fixed in a tag cut before either issue was even closed
+on GitHub. #3 (`ecke-button type="submit"`) and #4 (`ecke-input` width) were fixed this
+way and shipped in **v0.3.3**, which let `src/shell/Form.tsx` be deleted outright; #5
+(sidebar log-out glyph emitted nothing) and #6 (`ecke-sidebar-nav` overflowed its
+parent) were fixed in **v0.3.4**, which let `src/shell/useSidebarLogoutClick.ts` and
+`AppShell.css`'s `box-sizing` override be deleted the same way — that is the lifecycle.
+Still open: #7 (`ecke-input` has no `autocomplete`, so password managers can't fill a
+login form — **no workaround possible**), #8 (`ecke-table`'s `thead` and
 `ecke-pagination` hardcode `--surface-overlay`, staying opaque on a glass card), #9
 (`ecke-dropdown`'s popup is unclickable inside `ecke-modal` on one page — confirmed via
 `document.elementFromPoint()`, not reproduced on a structurally identical modal
